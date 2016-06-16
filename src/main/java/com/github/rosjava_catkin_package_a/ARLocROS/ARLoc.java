@@ -19,6 +19,7 @@ package com.github.rosjava_catkin_package_a.ARLocROS;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
+import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -49,6 +50,7 @@ public class ARLoc extends AbstractNodeMain {
 	private Mat image;
 	private Mat rvec;
 	private MatOfDouble tvec;
+	//private Jogl3DView jt;
 
 	@Override
 	public GraphName getDefaultNodeName() {
@@ -62,6 +64,8 @@ public class ARLoc extends AbstractNodeMain {
 		final Log log = connectedNode.getLog();
 		rvec = new Mat(3, 1, CvType.CV_64F);
 		tvec = new MatOfDouble(1.0, 1.0, 1.0);
+		// start OpenGL outup
+		//jt = Jogl3DView.start();
 		// Subscribe to Image
 		Subscriber<sensor_msgs.Image> subscriberToImage = connectedNode.newSubscriber("camera/rgb/image_raw",
 				sensor_msgs.Image._TYPE);
@@ -88,6 +92,7 @@ public class ARLoc extends AbstractNodeMain {
 								new Size(camp.width, camp.height))) {
 							// Imshow.show(image);
 							// log.info(rvec.dump() + " " + tvec.dump());
+							//jt.showandsafe(rvec, tvec);
 							synchronized (tvec) {
 								tvec.notify();
 							}
@@ -149,33 +154,38 @@ public class ARLoc extends AbstractNodeMain {
 		// // compute rotation
 		//
 		// QuaternionHelper q = new QuaternionHelper();
-		// q.setFromEuler((float) rvec.get(0, 0)[0], (float) rvec.get(1, 0)[0],
-		// (float) rvec.get(2, 0)[0]);
-		// System.out.println("Roll "+Math.toDegrees(rvec.get(0, 0)[0])+
-		// " Pitch "+Math.toDegrees(rvec.get(1, 0)[0])+
-		// " Yaw "+Math.toDegrees(rvec.get(2, 0)[0]));
+		// float bankX = (float) rvec.get(0, 0)[0];
+		// float headingY = (float) rvec.get(1, 0)[0];
+		// float attitudeZ = (float) rvec.get(2, 0)[0];
+		// q.setFromEuler(bankX, headingY, attitudeZ);
+		// System.out.println("Roll " + Math.toDegrees(rvec.get(0, 0)[0]) + "
+		// Pitch "
+		// + Math.toDegrees(rvec.get(1, 0)[0]) + " Yaw " +
+		// Math.toDegrees(rvec.get(2, 0)[0]));
 		// // set information to message
 		// geometry_msgs.PoseStamped posestamped = publisher.newMessage();
 		// Pose pose = posestamped.getPose();
 		// Quaternion orientation = pose.getOrientation();
 		// Point point = pose.getPosition();
-		// point.setX(tvec.get(0, 0)[0]);
-		// point.setY(tvec.get(1, 0)[0]);
-		// point.setZ(tvec.get(2, 0)[0]);
-		//
+		// // point.setX(tvec.get(0, 0)[0]);
+		// // point.setY(tvec.get(1, 0)[0]);
+		// // point.setZ(tvec.get(2, 0)[0]);
+		// point.setX(0);
+		// point.setY(0);
+		// point.setZ(0);
 		// orientation.setW(q.getW());
 		// orientation.setX(q.getX());
 		// orientation.setY(q.getY());
 		// orientation.setZ(q.getZ());
 		// // frame_id too
-		// posestamped.getHeader().setFrameId(camp.frame_id);
+		// posestamped.getHeader().setFrameId("base_link");
 		//
 		// publisher.publish(posestamped);
 		//
 		// }
 		// });
 
-		final Publisher<tf2_msgs.TFMessage> publisher = connectedNode.newPublisher("tf", tf2_msgs.TFMessage._TYPE);
+		final Publisher<tf2_msgs.TFMessage> publisher1 = connectedNode.newPublisher("tf", tf2_msgs.TFMessage._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
 
 			@Override
@@ -184,28 +194,22 @@ public class ARLoc extends AbstractNodeMain {
 				synchronized (tvec) {
 					tvec.wait();
 				}
-				// compute translation
-				// Mat R = new Mat(3, 3, CvType.CV_32FC1);
-				// Calib3d.Rodrigues(rvec, R);
-				// R = R.t();
-				// Core.multiply(R, new Scalar(-1), R);
-				// Core.gemm(R, tvec, 1, new Mat(), 0, tvec, 0);
-				// compute rotation
-				connectedNode.getTopicMessageFactory().newFromType(geometry_msgs.TransformStamped._TYPE);
 
 				QuaternionHelper q = new QuaternionHelper();
-				float bankX = (float) rvec.get(2, 0)[0];
-				float headingY = (float) rvec.get(1, 0)[0];
-				float attitudeZ = (float) rvec.get(0, 0)[0];
-				q.setFromEuler(bankX, headingY, attitudeZ);
-				//q.rotateByAngleY((float) (-Math.PI/2));
-				// System.out.println("Roll " + Math.toDegrees(rvec.get(0,
-				// 0)[0]) + " Pitch "
-				// + Math.toDegrees(rvec.get(1, 0)[0]) + " Yaw " +
-				// Math.toDegrees(rvec.get(2, 0)[0]));
+
+				/*
+				 * heading = atan2(-m20,m00) attitude = asin(m10) bank =
+				 * atan2(-m12,m11)
+				 */
+				Mat R = new Mat(3, 3, CvType.CV_32FC1);
+				Calib3d.Rodrigues(rvec, R);
+				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
+				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
+				double attitudeZ = Math.asin(R.get(1, 0)[0]);
+				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
 				
 				// set information to message
-				TFMessage tfmessage = publisher.newMessage();
+				TFMessage tfmessage = publisher1.newMessage();
 				TransformStamped posestamped = connectedNode.getTopicMessageFactory()
 						.newFromType(geometry_msgs.TransformStamped._TYPE);
 				Transform transform = posestamped.getTransform();
@@ -220,12 +224,13 @@ public class ARLoc extends AbstractNodeMain {
 				orientation.setX(q.getX());
 				orientation.setY(q.getY());
 				orientation.setZ(q.getZ());
-				posestamped.getHeader().setFrameId("world");
-				posestamped.setChildFrameId("robot");
+				posestamped.getHeader().setFrameId("camera_rgb_optical_frame");
+				posestamped.setChildFrameId("marker");
 				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
 				// frame_id too
 				tfmessage.getTransforms().add(posestamped);
-				publisher.publish(tfmessage);
+				publisher1.publish(tfmessage);
+				// System.exit(0);
 			}
 		});
 
@@ -241,7 +246,7 @@ public class ARLoc extends AbstractNodeMain {
 				int i = 0;
 				for (Point3 p : points3dlist) {
 					Marker markermessage = markerpublisher.newMessage();
-					markermessage.getHeader().setFrameId("world");
+					markermessage.getHeader().setFrameId("marker");
 					markermessage.setId(i);
 					i++;
 					markermessage.setType(visualization_msgs.Marker.SPHERE);

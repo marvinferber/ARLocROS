@@ -18,51 +18,51 @@ package com.github.rosjava_catkin_package_a.ARLocROS;
 
 
 public class QuaternionHelper {
-	private float x, y, z, w;
+	private double x, y, z, w;
 
 	
 	
 	public QuaternionHelper() {
 		x = y = z = 0;
-		w = 1;
+		w = 1.0;
 	}
 
-	public final float getW() {
+	public final double getW() {
 		return w;
 	}
 
-	public final void setW(final float w) {
+	public final void setW(final double w) {
 		this.w = w;
 	}
 
-	public final float getX() {
+	public final double getX() {
 		return x;
 	}
 
-	public final void setX(final float x) {
+	public final void setX(final double x) {
 		this.x = x;
 	}
 
-	public final float getY() {
+	public final double getY() {
 		return y;
 	}
 
-	public final void setY(final float y) {
+	public final void setY(final double y) {
 		this.y = y;
 	}
 
-	public final float getZ() {
+	public final double getZ() {
 		return z;
 	}
 
-	public final void setZ(final float z) {
+	public final void setZ(final double z) {
 		this.z = z;
 	}
 
 	public final QuaternionHelper normalize() {
-		final float norm = (float) Math.sqrt(w * w + x * x + y * y + z * z);
+		final double norm =  Math.sqrt(w * w + x * x + y * y + z * z);
 
-		final float invNorm = 1f / norm;
+		final double invNorm = 1.0 / norm;
 		w *= invNorm;
 		x *= invNorm;
 		y *= invNorm;
@@ -71,23 +71,23 @@ public class QuaternionHelper {
 		return this;
 	}
 
-	public final QuaternionHelper setFromEuler(final float bankX, final float headingY, final float attitudeZ) {
+	public final QuaternionHelper setFromEuler(final double bankX, final double headingY, final double attitudeZ) {
 
-		float angle = headingY * 0.5f;
-		final float sinHeadingY = (float) Math.sin(angle);
-		final float cosHeadingY = (float) Math.cos(angle);
-		angle = attitudeZ * 0.5f;
-		final float sinAttitudeZ = (float) Math.sin(angle);
-		final float cosAttitudeZ = (float) Math.cos(angle);
-		angle = bankX * 0.5f;
-		final float sinBankX = (float) Math.sin(angle);
-		final float cosBankX = (float) Math.cos(angle);
+		double angle = headingY * 0.5;
+		final double sinHeadingY = (double) Math.sin(angle);
+		final double cosHeadingY = (double) Math.cos(angle);
+		angle = attitudeZ * 0.5;
+		final double sinAttitudeZ = (double) Math.sin(angle);
+		final double cosAttitudeZ = (double) Math.cos(angle);
+		angle = bankX * 0.5;
+		final double sinBankX = (double) Math.sin(angle);
+		final double cosBankX = (double) Math.cos(angle);
 
 		// variables used to reduce multiplication calls.
-		final float cosHeadingXcosAttitude = cosHeadingY * cosAttitudeZ;
-		final float sinHeadingXsinAttitude = sinHeadingY * sinAttitudeZ;
-		final float cosHeadingXsinAttitude = cosHeadingY * sinAttitudeZ;
-		final float sinHeadingXcosAttitude = sinHeadingY * cosAttitudeZ;
+		final double cosHeadingXcosAttitude = cosHeadingY * cosAttitudeZ;
+		final double sinHeadingXsinAttitude = sinHeadingY * sinAttitudeZ;
+		final double cosHeadingXsinAttitude = cosHeadingY * sinAttitudeZ;
+		final double sinHeadingXcosAttitude = sinHeadingY * cosAttitudeZ;
 
 		w = cosHeadingXcosAttitude * cosBankX - sinHeadingXsinAttitude * sinBankX;
 		x = cosHeadingXcosAttitude * sinBankX + sinHeadingXsinAttitude * cosBankX;

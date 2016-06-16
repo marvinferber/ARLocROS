@@ -111,13 +111,27 @@ public class ComputePose {
 		// Imshow.show(image2);
 		MatOfPoint3f objectPoints = new MatOfPoint3f();
 		List<Point3> points3dlist = MarkerConfig.create3dpointlist();
+//		// rotate points to openCV system
+//		Mat cvrot = new Mat(3, 1, CvType.CV_64F);
+//		cvrot.put(0, 0, Math.PI / 2);
+//		cvrot.put(1, 0, 0);
+//		cvrot.put(2, 0, Math.PI / 2);
+//		Mat cvR = new Mat(3, 3, CvType.CV_64F);
+//		Calib3d.Rodrigues(cvrot, cvR);
+//		for (Point3 p : points3dlist) {
+//			Mat cvec = new MatOfDouble(p.x, p.y, p.z);
+//			//System.out.println(cvrot.dump());
+//			Core.gemm(cvR, cvec, 1, new Mat(), 0, cvec, 0);
+//			p.x = cvec.get(0, 0)[0];
+//			p.y = cvec.get(1, 0)[0];
+//			p.z = cvec.get(2, 0)[0];
+//		}
 		objectPoints.fromList(points3dlist);
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
 		imagePoints.fromList(points2dlist);
-		// for (int i = 0; i < points2dlist.size(); i++) {
-		// System.out.println(points2dlist.get(i) + "-->" +
-		// points3dlist.get(i));
-		// }
+//		for (int i = 0; i < points2dlist.size(); i++) {
+//			System.out.println(points2dlist.get(i) + "-->" + points3dlist.get(i));
+//		}
 
 		// getCameraParamasXperiaZ1FullHD(cameraMatrix, distCoeffs);
 
@@ -125,20 +139,20 @@ public class ComputePose {
 		// Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix,
 		// distCoeffs, rvec, tvec, false, 500, 2, 16,
 		// inliers, Calib3d.ITERATIVE);
-		Calib3d.solvePnP(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
-		System.out.println(tvec.dump() + " " + rvec.dump());
+		Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
+
 		// System.out.println(inliers.dump());
-		Mat R = new Mat(3, 3, CvType.CV_32FC1);
-		Calib3d.Rodrigues(rvec, R);
-		R = R.t();
-		// Calib3d.Rodrigues(R, rvec);
-		Core.multiply(R, new Scalar(-1), R);
-		// Calib3d.Rodrigues(R, rvec);
-		// System.out.println(R.dump()+" "+tvec.dump());
-		// R = R.t();
-		// Calib3d.Rodrigues(R, rvec);
-		// Core.multiply(R, new Scalar(-1), R);
-		Core.gemm(R, tvec, 1, new Mat(), 0, tvec, 0);
+//		Mat R = new Mat(3, 3, CvType.CV_32FC1);
+//		Calib3d.Rodrigues(rvec, R);
+//		R = R.t();
+//		 Calib3d.Rodrigues(R, rvec);
+//		//
+//		Core.multiply(R, new Scalar(-1), R);
+//		// Calib3d.Rodrigues(R, rvec);
+//
+//		//
+//		Core.gemm(R, tvec, 1, new Mat(), 0, tvec, 0);
+		//System.out.println(tvec.dump() + " " + rvec.dump());
 		return true;
 
 	}
