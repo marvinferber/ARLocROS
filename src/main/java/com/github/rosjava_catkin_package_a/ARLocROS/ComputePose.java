@@ -24,8 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.opencv.calib3d.Calib3d;
-import org.opencv.core.Core;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDouble;
 import org.opencv.core.MatOfPoint;
@@ -33,7 +31,6 @@ import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.MatOfPoint3f;
 import org.opencv.core.Point;
 import org.opencv.core.Point3;
-import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 
 import jp.nyatla.nyartoolkit.core.NyARCode;
@@ -55,11 +52,11 @@ import jp.nyatla.nyartoolkit.markersystem.NyARSensor;
 public class ComputePose {
 
 	public static boolean computePose(Mat rvec, Mat tvec, Mat cameraMatrix, MatOfDouble distCoeffs, Mat image2,
-			Size size) throws NyARException, FileNotFoundException {
-		String file1 = "4x4_98.patt";
-		String file2 = "4x4_1.patt";
-		String file3 = "4x4_2.patt";
-		String file4 = "4x4_3.patt";
+			Size size, String pattern_dir) throws NyARException, FileNotFoundException {
+		String file1 = pattern_dir + "4x4_98.patt";
+		String file2 = pattern_dir + "4x4_1.patt";
+		String file3 = pattern_dir + "4x4_2.patt";
+		String file4 = pattern_dir + "4x4_3.patt";
 		//
 		NyARCode code1 = NyARCode.createFromARPattFile(new FileInputStream(file1), 16, 16);
 		NyARCode code2 = NyARCode.createFromARPattFile(new FileInputStream(file2), 16, 16);
@@ -84,13 +81,13 @@ public class ComputePose {
 		NyARSensor arg0 = new NyARSensor(i_screen_size);
 		arg0.update(i_raster);
 		ms.update(arg0);
-		// System.out.print("Confidence: ");
+		//System.out.print("Confidence: ");
 		List<Point> points2dlist = new ArrayList<Point>();
 		for (int i = 0; i < ids.length; i++) {
 			if (!ms.isExistMarker(ids[i]))
 				return false;
 			NyARIntPoint2d[] vertex2d = ms.getMarkerVertex2D(ids[i]);
-			// System.out.print(ms.getConfidence(ids[i]) + " ");
+			//System.out.print(ms.getConfidence(ids[i]) + " ");
 
 			Point p = new Point(vertex2d[2].x, vertex2d[2].y);
 			points2dlist.add(p);
@@ -108,32 +105,16 @@ public class ComputePose {
 			// Imgproc.drawContours(image2, pts, -1, new Scalar(0, 0, 255));
 		}
 		// System.out.println();
-		// Imshow.show(image2);
+		Imshow.show(image2);
 		MatOfPoint3f objectPoints = new MatOfPoint3f();
 		List<Point3> points3dlist = MarkerConfig.create3dpointlist();
-//		// rotate points to openCV system
-//		Mat cvrot = new Mat(3, 1, CvType.CV_64F);
-//		cvrot.put(0, 0, Math.PI / 2);
-//		cvrot.put(1, 0, 0);
-//		cvrot.put(2, 0, Math.PI / 2);
-//		Mat cvR = new Mat(3, 3, CvType.CV_64F);
-//		Calib3d.Rodrigues(cvrot, cvR);
-//		for (Point3 p : points3dlist) {
-//			Mat cvec = new MatOfDouble(p.x, p.y, p.z);
-//			//System.out.println(cvrot.dump());
-//			Core.gemm(cvR, cvec, 1, new Mat(), 0, cvec, 0);
-//			p.x = cvec.get(0, 0)[0];
-//			p.y = cvec.get(1, 0)[0];
-//			p.z = cvec.get(2, 0)[0];
-//		}
 		objectPoints.fromList(points3dlist);
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
 		imagePoints.fromList(points2dlist);
-//		for (int i = 0; i < points2dlist.size(); i++) {
-//			System.out.println(points2dlist.get(i) + "-->" + points3dlist.get(i));
-//		}
-
-		// getCameraParamasXperiaZ1FullHD(cameraMatrix, distCoeffs);
+		// for (int i = 0; i < points2dlist.size(); i++) {
+		// System.out.println(points2dlist.get(i) + "-->" +
+		// points3dlist.get(i));
+		// }
 
 		// Mat inliers = new Mat();
 		// Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix,
@@ -142,17 +123,17 @@ public class ComputePose {
 		Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
 
 		// System.out.println(inliers.dump());
-//		Mat R = new Mat(3, 3, CvType.CV_32FC1);
-//		Calib3d.Rodrigues(rvec, R);
-//		R = R.t();
-//		 Calib3d.Rodrigues(R, rvec);
-//		//
-//		Core.multiply(R, new Scalar(-1), R);
-//		// Calib3d.Rodrigues(R, rvec);
-//
-//		//
-//		Core.gemm(R, tvec, 1, new Mat(), 0, tvec, 0);
-		//System.out.println(tvec.dump() + " " + rvec.dump());
+		// Mat R = new Mat(3, 3, CvType.CV_32FC1);
+		// Calib3d.Rodrigues(rvec, R);
+		// R = R.t();
+		// Calib3d.Rodrigues(R, rvec);
+		// //
+		// Core.multiply(R, new Scalar(-1), R);
+		// // Calib3d.Rodrigues(R, rvec);
+		//
+		// //
+		// Core.gemm(R, tvec, 1, new Mat(), 0, tvec, 0);
+		// System.out.println(tvec.dump() + " " + rvec.dump());
 		return true;
 
 	}
@@ -160,6 +141,7 @@ public class ComputePose {
 }
 
 class NyARImageHelper extends NyARRgbRaster {
+
 	public static INyARRgbRaster createFromMat(Mat image) {
 		BufferedImage bimg;
 		if (image != null) {
@@ -187,19 +169,13 @@ class NyARImageHelper extends NyARRgbRaster {
 		}
 
 		NyARImageHelper ra = null;
-		try {
-			int raster_type = NyARBufferType.BYTE1D_B8G8R8_24;
-			ra = new NyARImageHelper(bimg.getWidth(), bimg.getHeight(), raster_type, false);
-			assert (!ra._is_attached_buffer);
-			assert (ra._size.isEqualSize(bimg.getWidth(), bimg.getHeight()));
 
-			if (!ra.isEqualBufferType(raster_type)) {
-				throw new NyARException();
-			}
+		int raster_type = NyARBufferType.BYTE1D_B8G8R8_24;
+		try {
+			ra = new NyARImageHelper(bimg.getWidth(), bimg.getHeight(), raster_type, false);
 			ra._buf = ((DataBufferByte) (bimg.getRaster().getDataBuffer())).getData();
 			ra._rgb_pixel_driver.switchRaster(ra);
 		} catch (NyARException e) {
-
 			e.printStackTrace();
 		}
 
