@@ -60,7 +60,8 @@ public class ARLoc extends AbstractNodeMain {
 	private String CAMERA_FRAME_NAME;
 	private String CAMERA_IMAGE_TOPIC;
 	private String CAMERA_INFO_TOPIC;
-	
+	private String MARKER_CONFIG_FILE;
+
 	@Override
 	public GraphName getDefaultNodeName() {
 		return GraphName.of("rosjava/imshow");
@@ -81,6 +82,7 @@ public class ARLoc extends AbstractNodeMain {
 		final Log log = connectedNode.getLog();
 		log.info("Reading parameters");
 		PATTERN_DIR = connectedNode.getParameterTree().getString("/ARLocROS/pattern_dir");
+		MARKER_CONFIG_FILE = connectedNode.getParameterTree().getString("/ARLocROS/marker_config_file");
 		MARKER_FRAME_NAME = connectedNode.getParameterTree().getString("/ARLocROS/marker_frame_name");
 		CAMERA_FRAME_NAME = connectedNode.getParameterTree().getString("/ARLocROS/camera_frame_name");
 		CAMERA_IMAGE_TOPIC = connectedNode.getParameterTree().getString("/ARLocROS/camera_image_topic");
@@ -117,15 +119,15 @@ public class ARLoc extends AbstractNodeMain {
 					try {
 						//
 						image = Utils.matFromImage(message);
-						image.convertTo(image, -1, 2, 0.0);
-						// Imshow.show(image);
+						//image.convertTo(image, -1, 2, 0.0);
+						//Imshow.show(image);
 						// setup camera matrix and return vectors
 						Mat cameraMatrix = new Mat(new Size(3, 3), CvType.CV_32FC1);
 						MatOfDouble distCoeffs = new MatOfDouble(new Mat(4, 1, CvType.CV_64FC1));
 						CameraParams.getCameraParamas(cameraMatrix, distCoeffs, camp);
 						// compute pose
 						if (ComputePose.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
-								new Size(camp.width, camp.height), PATTERN_DIR)) {
+								new Size(camp.width, camp.height), PATTERN_DIR, MARKER_CONFIG_FILE)) {
 							// Imshow.show(image);
 							// log.info("Pose detected!");
 							// jt.showandsafe(rvec, tvec);
@@ -141,8 +143,8 @@ public class ARLoc extends AbstractNodeMain {
 			}
 		});
 		// Subscribe to camera info
-		Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode
-				.newSubscriber(CAMERA_INFO_TOPIC, sensor_msgs.CameraInfo._TYPE);
+		Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(CAMERA_INFO_TOPIC,
+				sensor_msgs.CameraInfo._TYPE);
 		subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
 
 			@Override
@@ -167,25 +169,25 @@ public class ARLoc extends AbstractNodeMain {
 				}
 			}
 		});
-		
-		//bebop 
-//		camp = new CameraParams();
-//		camp.fx = 396.17782;//message.getK()[0];
-//		camp.fy = 399.798333;//message.getK()[4];
-//		;
-//		camp.cx = 322.453185;//message.getK()[2];
-//		;
-//		camp.cy =174.243174;// message.getK()[5];
-//		;
-//		camp.k1 = -0.001983;//message.getD()[0];
-//		camp.k2 = 0.015844;//message.getD()[1];
-//		camp.p1 = -0.003171;//message.getD()[2];
-//		camp.p2 =0.001506;// message.getD()[3];
-//		camp.width = 640;//message.getWidth();
-//		camp.height = 368;//message.getHeight();
-//		camp.frame_id = "bebop_front";//message.getHeader().getFrameId();
+
+		// bebop
+		// camp = new CameraParams();
+		// camp.fx = 396.17782;//message.getK()[0];
+		// camp.fy = 399.798333;//message.getK()[4];
+		// ;
+		// camp.cx = 322.453185;//message.getK()[2];
+		// ;
+		// camp.cy =174.243174;// message.getK()[5];
+		// ;
+		// camp.k1 = -0.001983;//message.getD()[0];
+		// camp.k2 = 0.015844;//message.getD()[1];
+		// camp.p1 = -0.003171;//message.getD()[2];
+		// camp.p2 =0.001506;// message.getD()[3];
+		// camp.width = 640;//message.getWidth();
+		// camp.height = 368;//message.getHeight();
+		// camp.frame_id = "bebop_front";//message.getHeader().getFrameId();
 		log.info("Setting up camera parameters");
-		
+
 		final Publisher<tf2_msgs.TFMessage> publisher1 = connectedNode.newPublisher("tf", tf2_msgs.TFMessage._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
 
@@ -248,7 +250,7 @@ public class ARLoc extends AbstractNodeMain {
 			protected void loop() throws InterruptedException {
 
 				Thread.sleep(500);
-				List<Point3> points3dlist = MarkerConfig.create3dpointlist();
+				List<Point3> points3dlist = MarkerConfig.getUnordered3DPointList();
 				int i = 0;
 				for (Point3 p : points3dlist) {
 					Marker markermessage = markerpublisher.newMessage();
@@ -283,8 +285,6 @@ public class ARLoc extends AbstractNodeMain {
 		final Publisher<tf2_msgs.TFMessage> tfPublisher_map_to_odom = connectedNode.newPublisher("tf",
 				tf2_msgs.TFMessage._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
-
-			
 
 			@Override
 			protected void loop() throws InterruptedException {

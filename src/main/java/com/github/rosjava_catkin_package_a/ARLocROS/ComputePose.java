@@ -21,7 +21,9 @@ import java.awt.image.DataBufferByte;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Mat;
@@ -52,16 +54,13 @@ import jp.nyatla.nyartoolkit.markersystem.NyARSensor;
 public class ComputePose {
 
 	public static boolean computePose(Mat rvec, Mat tvec, Mat cameraMatrix, MatOfDouble distCoeffs, Mat image2,
-			Size size, String pattern_dir) throws NyARException, FileNotFoundException {
-		String file1 = pattern_dir + "4x4_98.patt";
-		String file2 = pattern_dir + "4x4_1.patt";
-		String file3 = pattern_dir + "4x4_2.patt";
-		String file4 = pattern_dir + "4x4_3.patt";
+			Size size, String pattern_dir, String mARKER_CONFIG_FILE) throws NyARException, FileNotFoundException {
+		// read marker patterns from config and init config
+		List<String> markerPatterns = MarkerConfig.readFromConfig(mARKER_CONFIG_FILE);
 		//
-		NyARCode code1 = NyARCode.createFromARPattFile(new FileInputStream(file1), 16, 16);
-		NyARCode code2 = NyARCode.createFromARPattFile(new FileInputStream(file2), 16, 16);
-		NyARCode code3 = NyARCode.createFromARPattFile(new FileInputStream(file3), 16, 16);
-		NyARCode code4 = NyARCode.createFromARPattFile(new FileInputStream(file4), 16, 16);
+		// List<NyARCode> codeList = new ArrayList<>();
+		// create hasmap of correspondences between id and file/pattern name
+		Map<Integer, String> patternmap = new HashMap<>();
 		//
 		NyARIntSize i_screen_size = new NyARIntSize((int) size.width, (int) size.height);
 		NyARPerspectiveProjectionMatrix i_projection_mat = new NyARPerspectiveProjectionMatrix();
@@ -69,57 +68,84 @@ public class ComputePose {
 		//
 		NyARParam i_param = new NyARParam(i_screen_size, i_projection_mat, i_dist_factor);
 		//
-		INyARRgbRaster i_raster = NyARImageHelper.createFromMat(image2);
+		INyARRgbRaster imageRaster = NyARImageHelper.createFromMat(image2);
 
 		INyARMarkerSystemConfig i_config = new NyARMarkerSystemConfig(i_param);
-		NyARMarkerSystem ms = new NyARMarkerSystem(i_config);
-		int[] ids = new int[4];
-		ids[0] = ms.addARMarker(code1, 25, 135);
-		ids[1] = ms.addARMarker(code2, 25, 135);
-		ids[2] = ms.addARMarker(code3, 25, 135);
-		ids[3] = ms.addARMarker(code4, 25, 135);
-		NyARSensor arg0 = new NyARSensor(i_screen_size);
-		arg0.update(i_raster);
-		ms.update(arg0);
+		NyARMarkerSystem markerSystemState = new NyARMarkerSystem(i_config);
+		int[] ids = new int[markerPatterns.size()];
+		for (int i = 0; i < markerPatterns.size(); i++) {
+			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(pattern_dir + markerPatterns.get(i)), 16,
+					16);
+			// codeList.add(code);
+			//System.out.print(MarkerConfig.getMarkerSize());
+			ids[i] = markerSystemState.addARMarker(code, 25, MarkerConfig.getMarkerSize());
+			patternmap.put(ids[i], markerPatterns.get(i));
+		}
+		// System.out.println();
+		//
+		NyARSensor cameraSensorWrapper = new NyARSensor(i_screen_size);
+		cameraSensorWrapper.update(imageRaster);
+		markerSystemState.update(cameraSensorWrapper);
+		// init 3d point list
+		List<Point3> points3dlist = new ArrayList<>();
 		// System.out.print("Confidence: ");
 		List<Point> points2dlist = new ArrayList<Point>();
 		for (int i = 0; i < ids.length; i++) {
-			if (!ms.isExistMarker(ids[i]))
-				return false;
-			NyARIntPoint2d[] vertex2d = ms.getMarkerVertex2D(ids[i]);
-			// System.out.print(ms.getConfidence(ids[i]) + " ");
+			if (markerSystemState.isExistMarker(ids[i])) {
+				// read and add 2d points
+				NyARIntPoint2d[] vertex2d = markerSystemState.getMarkerVertex2D(ids[i]);
+				//System.out.print(patternmap.get(ids[i]) + " ");
 
-			Point p = new Point(vertex2d[2].x, vertex2d[2].y);
-			points2dlist.add(p);
-			p = new Point(vertex2d[3].x, vertex2d[3].y);
-			points2dlist.add(p);
-			p = new Point(vertex2d[0].x, vertex2d[0].y);
-			points2dlist.add(p);
-			p = new Point(vertex2d[1].x, vertex2d[1].y);
-			points2dlist.add(p);
+				// Point p = new Point(vertex2d[2].x, vertex2d[2].y);
+				// points2dlist.add(p);
+				// p = new Point(vertex2d[3].x, vertex2d[3].y);
+				// points2dlist.add(p);
+				// p = new Point(vertex2d[0].x, vertex2d[0].y);
+				// points2dlist.add(p);
+				// p = new Point(vertex2d[1].x, vertex2d[1].y);
+				// points2dlist.add(p);
+				Point p = new Point(vertex2d[0].x, vertex2d[0].y);
+				points2dlist.add(p);
+				p = new Point(vertex2d[1].x, vertex2d[2].y);
+				points2dlist.add(p);
+				p = new Point(vertex2d[2].x, vertex2d[2].y);
+				points2dlist.add(p);
+				p = new Point(vertex2d[3].x, vertex2d[3].y);
+				points2dlist.add(p);
 
-			MatOfPoint mop = new MatOfPoint();
-			mop.fromList(points2dlist);
-			List<MatOfPoint> pts = new ArrayList<MatOfPoint>();
-			pts.add(mop);
+				MatOfPoint mop = new MatOfPoint();
+				mop.fromList(points2dlist);
+				List<MatOfPoint> pts = new ArrayList<MatOfPoint>();
+				pts.add(mop);
+				// read and add corresponding 3d points
+				points3dlist.addAll(MarkerConfig.create3dpointlist(patternmap.get(ids[i])));
+			}
 			// Imgproc.drawContours(image2, pts, -1, new Scalar(0, 0, 255));
 		}
+		//System.out.println();
+//		for (int i = 0; i < points2dlist.size(); i++) {
+//			System.out.println(points2dlist.get(i) + "-->" + points3dlist.get(i));
+//		}
 		// System.out.println();
-		// Imshow.show(image2);
+		//Imshow.show(image2);
 		MatOfPoint3f objectPoints = new MatOfPoint3f();
-		List<Point3> points3dlist = MarkerConfig.create3dpointlist();
+		// List<Point3> points3dlist = MarkerConfig.create3dpointlist();
 		objectPoints.fromList(points3dlist);
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
 		imagePoints.fromList(points2dlist);
+
 		// for (int i = 0; i < points2dlist.size(); i++) {
 		// System.out.println(points2dlist.get(i) + "-->" +
 		// points3dlist.get(i));
 		// }
 
+		if (points2dlist.size() == 0)
+			return false;
+
 		// Mat inliers = new Mat();
 		// Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix,
 		// distCoeffs, rvec, tvec, false, 500, 2, 16,
-		// inliers, Calib3d.ITERATIVE);
+		// inliers, Calib3d.CV_EPNP);
 		Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
 
 		// System.out.println(inliers.dump());
