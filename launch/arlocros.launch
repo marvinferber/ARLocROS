@@ -1,0 +1,9 @@
+<launch>
+    <node pkg="rosjava_catkin_package_a" type="ARLocROS" name="ARLocROS" args="com.github.rosjava_catkin_package_a.ARLocROS.ARLoc" output="screen">
+        <param name="pattern_dir" value="/home/ferber/catkin_ws/src/rosjava_catkin_package_a/ARLocROS/res/"/>
+        <param name="marker_frame_name" value="marker" />
+        <param name="camera_frame_name" value="camera_rgb_optical_frame" />
+        <param name="camera_image_topic" value="/camera/rgb/image_raw" />
+        <param name="camera_info_topic" value="/camera/rgb/camera_info" />
+    </node>
+</launch>

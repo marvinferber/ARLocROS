@@ -127,7 +127,7 @@ public class ARLoc extends AbstractNodeMain {
 						if (ComputePose.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
 								new Size(camp.width, camp.height), PATTERN_DIR)) {
 							// Imshow.show(image);
-							log.info("Pose detected!");
+							// log.info("Pose detected!");
 							// jt.showandsafe(rvec, tvec);
 							synchronized (tvec) {
 								tvec.notifyAll();
@@ -141,49 +141,49 @@ public class ARLoc extends AbstractNodeMain {
 			}
 		});
 		// Subscribe to camera info
-//		Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode
-//				.newSubscriber(CAMERA_INFO_TOPIC, sensor_msgs.CameraInfo._TYPE);
-//		subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
-//
-//			@Override
-//			public void onNewMessage(sensor_msgs.CameraInfo message) {
-//				if (camp == null) {
-//					camp = new CameraParams();
-//					camp.fx = message.getK()[0];
-//					camp.fy = message.getK()[4];
-//					;
-//					camp.cx = message.getK()[2];
-//					;
-//					camp.cy = message.getK()[5];
-//					;
-//					camp.k1 = message.getD()[0];
-//					camp.k2 = message.getD()[1];
-//					camp.p1 = message.getD()[2];
-//					camp.p2 = message.getD()[3];
-//					camp.width = message.getWidth();
-//					camp.height = message.getHeight();
-//					camp.frame_id = message.getHeader().getFrameId();
-//					log.info("Setting up camera parameters");
-//				}
-//			}
-//		});
+		Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode
+				.newSubscriber(CAMERA_INFO_TOPIC, sensor_msgs.CameraInfo._TYPE);
+		subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
+
+			@Override
+			public void onNewMessage(sensor_msgs.CameraInfo message) {
+				if (camp == null) {
+					camp = new CameraParams();
+					camp.fx = message.getK()[0];
+					camp.fy = message.getK()[4];
+					;
+					camp.cx = message.getK()[2];
+					;
+					camp.cy = message.getK()[5];
+					;
+					camp.k1 = message.getD()[0];
+					camp.k2 = message.getD()[1];
+					camp.p1 = message.getD()[2];
+					camp.p2 = message.getD()[3];
+					camp.width = message.getWidth();
+					camp.height = message.getHeight();
+					camp.frame_id = message.getHeader().getFrameId();
+					log.info("Setting up camera parameters");
+				}
+			}
+		});
 		
 		//bebop 
-		camp = new CameraParams();
-		camp.fx = 396.17782;//message.getK()[0];
-		camp.fy = 399.798333;//message.getK()[4];
-		;
-		camp.cx = 322.453185;//message.getK()[2];
-		;
-		camp.cy =174.243174;// message.getK()[5];
-		;
-		camp.k1 = -0.001983;//message.getD()[0];
-		camp.k2 = 0.015844;//message.getD()[1];
-		camp.p1 = -0.003171;//message.getD()[2];
-		camp.p2 =0.001506;// message.getD()[3];
-		camp.width = 640;//message.getWidth();
-		camp.height = 368;//message.getHeight();
-		camp.frame_id = "bebop_front";//message.getHeader().getFrameId();
+//		camp = new CameraParams();
+//		camp.fx = 396.17782;//message.getK()[0];
+//		camp.fy = 399.798333;//message.getK()[4];
+//		;
+//		camp.cx = 322.453185;//message.getK()[2];
+//		;
+//		camp.cy =174.243174;// message.getK()[5];
+//		;
+//		camp.k1 = -0.001983;//message.getD()[0];
+//		camp.k2 = 0.015844;//message.getD()[1];
+//		camp.p1 = -0.003171;//message.getD()[2];
+//		camp.p2 =0.001506;// message.getD()[3];
+//		camp.width = 640;//message.getWidth();
+//		camp.height = 368;//message.getHeight();
+//		camp.frame_id = "bebop_front";//message.getHeader().getFrameId();
 		log.info("Setting up camera parameters");
 		
 		final Publisher<tf2_msgs.TFMessage> publisher1 = connectedNode.newPublisher("tf", tf2_msgs.TFMessage._TYPE);

@@ -81,13 +81,13 @@ public class ComputePose {
 		NyARSensor arg0 = new NyARSensor(i_screen_size);
 		arg0.update(i_raster);
 		ms.update(arg0);
-		//System.out.print("Confidence: ");
+		// System.out.print("Confidence: ");
 		List<Point> points2dlist = new ArrayList<Point>();
 		for (int i = 0; i < ids.length; i++) {
 			if (!ms.isExistMarker(ids[i]))
 				return false;
 			NyARIntPoint2d[] vertex2d = ms.getMarkerVertex2D(ids[i]);
-			//System.out.print(ms.getConfidence(ids[i]) + " ");
+			// System.out.print(ms.getConfidence(ids[i]) + " ");
 
 			Point p = new Point(vertex2d[2].x, vertex2d[2].y);
 			points2dlist.add(p);
@@ -105,7 +105,7 @@ public class ComputePose {
 			// Imgproc.drawContours(image2, pts, -1, new Scalar(0, 0, 255));
 		}
 		// System.out.println();
-		Imshow.show(image2);
+		// Imshow.show(image2);
 		MatOfPoint3f objectPoints = new MatOfPoint3f();
 		List<Point3> points3dlist = MarkerConfig.create3dpointlist();
 		objectPoints.fromList(points3dlist);
