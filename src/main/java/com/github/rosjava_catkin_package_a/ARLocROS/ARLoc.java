@@ -427,11 +427,13 @@ public class ARLoc extends AbstractNodeMain {
 				orientation.setX(result.getRotationAndScale().getX());
 				orientation.setY(result.getRotationAndScale().getY());
 				orientation.setZ(result.getRotationAndScale().getZ());
+
 				
 				// frame_id too
 				posestamped.getHeader().setFrameId("map");
 				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
 				publisher.publish(posestamped);
+
 
 			}
 		});

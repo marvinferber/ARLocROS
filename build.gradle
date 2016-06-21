@@ -26,10 +26,27 @@ mainClassName = 'org.ros.RosRun'
  which usually occur on minor and major version numbers.
 */
 repositories {
-maven {
+    maven {
+        url "https://github.com/rosjava/rosjava_mvn_repo/raw/master"
+    }
+
+    maven {
         url "https://jitpack.io"
     }
+
+//    mavenLocal()
+    mavenCentral()
+    repositories {
+        maven {
+            url "http://repo1.maven.org/maven2/"
+        }
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
 }
+
+
 dependencies {
   /* An external maven artifact dependency */
   compile 'org.ros.rosjava_core:rosjava:[0.2,0.3)'
