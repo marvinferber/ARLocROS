@@ -342,9 +342,9 @@ public class ARLoc extends AbstractNodeMain {
 
 				// set information to message
 				TFMessage tfmessage = tfPublisher_map_to_odom.newMessage();
-				TransformStamped posestamped = connectedNode.getTopicMessageFactory()
+				TransformStamped transformStamped = connectedNode.getTopicMessageFactory()
 						.newFromType(geometry_msgs.TransformStamped._TYPE);
-				Transform transform = posestamped.getTransform();
+				Transform transform = transformStamped.getTransform();
 
 				Quaternion orientation = transform.getRotation();
 				Vector3 point = transform.getTranslation();
@@ -359,13 +359,16 @@ public class ARLoc extends AbstractNodeMain {
 				orientation.setX(result.getRotationAndScale().getX());
 				orientation.setY(result.getRotationAndScale().getY());
 				orientation.setZ(result.getRotationAndScale().getZ());
-				posestamped.getHeader().setFrameId("map");
-				posestamped.setChildFrameId("odom");
-				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
+				transformStamped.getHeader().setFrameId("map");
+				transformStamped.setChildFrameId("odom");
+				transformStamped.getHeader().setStamp(connectedNode.getCurrentTime());
 				// frame_id too
-				tfmessage.getTransforms().add(posestamped);
+				tfmessage.getTransforms().add(transformStamped);
 				tfPublisher_map_to_odom.publish(tfmessage);
 				// System.exit(0);
+				
+				//calculate pose
+				
 			}
 		});
 
