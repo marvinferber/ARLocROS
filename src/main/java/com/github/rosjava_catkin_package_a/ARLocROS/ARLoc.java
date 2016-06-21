@@ -36,6 +36,8 @@ import org.ros.node.NodeMain;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 
+import geometry_msgs.Point;
+import geometry_msgs.Pose;
 import geometry_msgs.Quaternion;
 import geometry_msgs.Transform;
 import geometry_msgs.TransformStamped;
@@ -119,8 +121,8 @@ public class ARLoc extends AbstractNodeMain {
 					try {
 						//
 						image = Utils.matFromImage(message);
-						//image.convertTo(image, -1, 2, 0.0);
-						//Imshow.show(image);
+						// image.convertTo(image, -1, 2, 0.0);
+						// Imshow.show(image);
 						// setup camera matrix and return vectors
 						Mat cameraMatrix = new Mat(new Size(3, 3), CvType.CV_32FC1);
 						MatOfDouble distCoeffs = new MatOfDouble(new Mat(4, 1, CvType.CV_64FC1));
@@ -169,23 +171,6 @@ public class ARLoc extends AbstractNodeMain {
 				}
 			}
 		});
-
-		// bebop
-		// camp = new CameraParams();
-		// camp.fx = 396.17782;//message.getK()[0];
-		// camp.fy = 399.798333;//message.getK()[4];
-		// ;
-		// camp.cx = 322.453185;//message.getK()[2];
-		// ;
-		// camp.cy =174.243174;// message.getK()[5];
-		// ;
-		// camp.k1 = -0.001983;//message.getD()[0];
-		// camp.k2 = 0.015844;//message.getD()[1];
-		// camp.p1 = -0.003171;//message.getD()[2];
-		// camp.p2 =0.001506;// message.getD()[3];
-		// camp.width = 640;//message.getWidth();
-		// camp.height = 368;//message.getHeight();
-		// camp.frame_id = "bebop_front";//message.getHeader().getFrameId();
 		log.info("Setting up camera parameters");
 
 		final Publisher<tf2_msgs.TFMessage> publisher1 = connectedNode.newPublisher("tf", tf2_msgs.TFMessage._TYPE);
@@ -320,9 +305,8 @@ public class ARLoc extends AbstractNodeMain {
 						q.getY(), q.getZ(), q.getW());
 				double x = tvec_map_cam.get(0, 0)[0];
 				double y = tvec_map_cam.get(1, 0)[0];
-				;
 				double z = tvec_map_cam.get(2, 0)[0];
-				;
+
 				org.ros.rosjava_geometry.Vector3 translation = new org.ros.rosjava_geometry.Vector3(x, y, z);
 				org.ros.rosjava_geometry.Transform transform_map_cam = new org.ros.rosjava_geometry.Transform(
 						translation, rotation);
@@ -342,13 +326,97 @@ public class ARLoc extends AbstractNodeMain {
 
 				// set information to message
 				TFMessage tfmessage = tfPublisher_map_to_odom.newMessage();
-				TransformStamped posestamped = connectedNode.getTopicMessageFactory()
+				TransformStamped transformStamped = connectedNode.getTopicMessageFactory()
 						.newFromType(geometry_msgs.TransformStamped._TYPE);
-				Transform transform = posestamped.getTransform();
+				Transform transform = transformStamped.getTransform();
 
 				Quaternion orientation = transform.getRotation();
-				Vector3 point = transform.getTranslation();
+				Vector3 vector = transform.getTranslation();
 
+				vector.setX(result.getTranslation().getX());
+
+				vector.setY(result.getTranslation().getY());
+
+				vector.setZ(result.getTranslation().getZ());
+
+				orientation.setW(result.getRotationAndScale().getW());
+				orientation.setX(result.getRotationAndScale().getX());
+				orientation.setY(result.getRotationAndScale().getY());
+				orientation.setZ(result.getRotationAndScale().getZ());
+				transformStamped.getHeader().setFrameId("map");
+				transformStamped.setChildFrameId("odom");
+				transformStamped.getHeader().setStamp(connectedNode.getCurrentTime());
+				// frame_id too
+				tfmessage.getTransforms().add(transformStamped);
+				tfPublisher_map_to_odom.publish(tfmessage);
+				// System.exit(0);
+			}
+		});
+
+		// Publish Pose
+
+		final Publisher<geometry_msgs.PoseStamped> publisher = connectedNode.newPublisher("arlocros/pose",
+				geometry_msgs.PoseStamped._TYPE);
+
+		connectedNode.executeCancellableLoop(new CancellableLoop() {
+
+			@Override
+			protected void loop() throws InterruptedException {
+
+				synchronized (tvec) {
+					tvec.wait();
+				}
+				QuaternionHelper q = new QuaternionHelper();
+
+				Mat R = new Mat(3, 3, CvType.CV_32FC1);
+				Calib3d.Rodrigues(rvec, R);
+				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
+				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
+				double attitudeZ = Math.asin(R.get(1, 0)[0]);
+				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
+
+				// compute transform map to odom from map to
+				// camera_rgb_optical_frame and odom to camera_rgb_optical_frame
+
+				// map to camera_rgb_optical_frame
+				Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
+				R = R.t();
+
+				bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
+				headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
+				attitudeZ = Math.asin(R.get(1, 0)[0]);
+				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
+				Core.multiply(R, new Scalar(-1), R);
+				Core.gemm(R, tvec, 1, new Mat(), 0, tvec_map_cam, 0);
+				org.ros.rosjava_geometry.Quaternion rotation = new org.ros.rosjava_geometry.Quaternion(q.getX(),
+						q.getY(), q.getZ(), q.getW());
+				double x = tvec_map_cam.get(0, 0)[0];
+				double y = tvec_map_cam.get(1, 0)[0];
+				double z = tvec_map_cam.get(2, 0)[0];
+
+				org.ros.rosjava_geometry.Vector3 translation = new org.ros.rosjava_geometry.Vector3(x, y, z);
+				org.ros.rosjava_geometry.Transform transform_map_cam = new org.ros.rosjava_geometry.Transform(
+						translation, rotation);
+
+				// odom to camera_rgb_optical_frame
+				GraphName sourceFrame = GraphName.of(CAMERA_FRAME_NAME);
+				GraphName targetFrame = GraphName.of("base_link");
+				org.ros.rosjava_geometry.Transform transform_cam_base = null;
+				if (transformer.canTransform(targetFrame, sourceFrame)) {
+					transform_cam_base = transformer.lookupTransform(targetFrame, sourceFrame);
+
+				}
+				// multiply results
+				org.ros.rosjava_geometry.Transform result = org.ros.rosjava_geometry.Transform.identity();
+				result = result.multiply(transform_map_cam);
+				result = result.multiply(transform_cam_base);
+				
+				// set information to message
+				geometry_msgs.PoseStamped posestamped = publisher.newMessage();
+				Pose pose = posestamped.getPose();
+				Quaternion orientation = pose.getOrientation();
+				Point point = pose.getPosition();
+				
 				point.setX(result.getTranslation().getX());
 
 				point.setY(result.getTranslation().getY());
@@ -359,13 +427,12 @@ public class ARLoc extends AbstractNodeMain {
 				orientation.setX(result.getRotationAndScale().getX());
 				orientation.setY(result.getRotationAndScale().getY());
 				orientation.setZ(result.getRotationAndScale().getZ());
-				posestamped.getHeader().setFrameId("map");
-				posestamped.setChildFrameId("odom");
-				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
+				
 				// frame_id too
-				tfmessage.getTransforms().add(posestamped);
-				tfPublisher_map_to_odom.publish(tfmessage);
-				// System.exit(0);
+				posestamped.getHeader().setFrameId("map");
+				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
+				publisher.publish(posestamped);
+
 			}
 		});
 
