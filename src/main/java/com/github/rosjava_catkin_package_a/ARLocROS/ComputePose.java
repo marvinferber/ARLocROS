@@ -51,59 +51,63 @@ import jp.nyatla.nyartoolkit.markersystem.NyARMarkerSystem;
 import jp.nyatla.nyartoolkit.markersystem.NyARMarkerSystemConfig;
 import jp.nyatla.nyartoolkit.markersystem.NyARSensor;
 
+/**
+ * Static class that contains the pose computation from multiple AR marker
+ * system using NyARToolkit Java library.
+ * http://nyatla.jp/nyartoolkit/wp/?page_id=198
+ *
+ */
 public class ComputePose {
 
+	/**
+	 * @param rvec
+	 * @param tvec
+	 * @param cameraMatrix
+	 * @param distCoeffs
+	 * @param image2
+	 * @param size
+	 * @param markerConfig
+	 * @return
+	 * @throws NyARException
+	 * @throws FileNotFoundException
+	 */
 	public static boolean computePose(Mat rvec, Mat tvec, Mat cameraMatrix, MatOfDouble distCoeffs, Mat image2,
-			Size size, String pattern_dir, String mARKER_CONFIG_FILE) throws NyARException, FileNotFoundException {
-		// read marker patterns from config and init config
-		List<String> markerPatterns = MarkerConfig.readFromConfig(mARKER_CONFIG_FILE);
-		//
-		// List<NyARCode> codeList = new ArrayList<>();
-		// create hasmap of correspondences between id and file/pattern name
+			Size size, MarkerConfig markerConfig) throws NyARException, FileNotFoundException {
+		// get pattern files from marker config
+		List<String> markerPatterns = markerConfig.getPatternFileList();
+		// create hashmap of correspondences between id and file/pattern name
 		Map<Integer, String> patternmap = new HashMap<>();
-		//
+		// create and load camera specific classes
 		NyARIntSize i_screen_size = new NyARIntSize((int) size.width, (int) size.height);
 		NyARPerspectiveProjectionMatrix i_projection_mat = new NyARPerspectiveProjectionMatrix();
 		INyARCameraDistortionFactor i_dist_factor = new NyARCameraDistortionFactorV2();
-		//
 		NyARParam i_param = new NyARParam(i_screen_size, i_projection_mat, i_dist_factor);
-		//
+		// convert image to NyAR style for processing
 		INyARRgbRaster imageRaster = NyARImageHelper.createFromMat(image2);
-
+		// create new marker system configuration
 		INyARMarkerSystemConfig i_config = new NyARMarkerSystemConfig(i_param);
 		NyARMarkerSystem markerSystemState = new NyARMarkerSystem(i_config);
 		int[] ids = new int[markerPatterns.size()];
 		for (int i = 0; i < markerPatterns.size(); i++) {
-			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(pattern_dir + markerPatterns.get(i)), 16,
-					16);
-			// codeList.add(code);
-			//System.out.print(MarkerConfig.getMarkerSize());
-			ids[i] = markerSystemState.addARMarker(code, 25, MarkerConfig.getMarkerSize());
+			// create marker description from pattern file and add to marker
+			// system
+			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(markerPatterns.get(i)), 16, 16);
+			ids[i] = markerSystemState.addARMarker(code, 25, markerConfig.getMarkerSize());
 			patternmap.put(ids[i], markerPatterns.get(i));
 		}
-		// System.out.println();
-		//
+		// Create wrapper that passes cam pictures to marker system
 		NyARSensor cameraSensorWrapper = new NyARSensor(i_screen_size);
 		cameraSensorWrapper.update(imageRaster);
 		markerSystemState.update(cameraSensorWrapper);
-		// init 3d point list
+		// init 3D point list
 		List<Point3> points3dlist = new ArrayList<>();
-		// System.out.print("Confidence: ");
+
 		List<Point> points2dlist = new ArrayList<Point>();
 		for (int i = 0; i < ids.length; i++) {
+			// process only if this marker has been detected
 			if (markerSystemState.isExistMarker(ids[i])) {
-				// read and add 2d points
+				// read and add 2D points
 				NyARIntPoint2d[] vertex2d = markerSystemState.getMarkerVertex2D(ids[i]);
-				//System.out.print(patternmap.get(ids[i]) + " ");
-
-				// Point p = new Point(vertex2d[2].x, vertex2d[2].y);
-				// points2dlist.add(p);
-				// p = new Point(vertex2d[3].x, vertex2d[3].y);
-				// points2dlist.add(p);
-				// p = new Point(vertex2d[0].x, vertex2d[0].y);
-				// points2dlist.add(p);
-				// p = new Point(vertex2d[1].x, vertex2d[1].y);
-				// points2dlist.add(p);
 				Point p = new Point(vertex2d[0].x, vertex2d[0].y);
 				points2dlist.add(p);
 				p = new Point(vertex2d[1].x, vertex2d[2].y);
@@ -117,57 +121,46 @@ public class ComputePose {
 				mop.fromList(points2dlist);
 				List<MatOfPoint> pts = new ArrayList<MatOfPoint>();
 				pts.add(mop);
-				// read and add corresponding 3d points
-				points3dlist.addAll(MarkerConfig.create3dpointlist(patternmap.get(ids[i])));
+				// read and add corresponding 3D points
+				points3dlist.addAll(markerConfig.create3dpointlist(patternmap.get(ids[i])));
 			}
-			// Imgproc.drawContours(image2, pts, -1, new Scalar(0, 0, 255));
+
 		}
-		//System.out.println();
-//		for (int i = 0; i < points2dlist.size(); i++) {
-//			System.out.println(points2dlist.get(i) + "-->" + points3dlist.get(i));
-//		}
-		// System.out.println();
-		//Imshow.show(image2);
+		// load 2D and 3D points to Mats for solvePNP
 		MatOfPoint3f objectPoints = new MatOfPoint3f();
-		// List<Point3> points3dlist = MarkerConfig.create3dpointlist();
 		objectPoints.fromList(points3dlist);
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
 		imagePoints.fromList(points2dlist);
 
-		// for (int i = 0; i < points2dlist.size(); i++) {
-		// System.out.println(points2dlist.get(i) + "-->" +
-		// points3dlist.get(i));
-		// }
-
+		// do not call solvePNP with empty intput data (no markers detected)
 		if (points2dlist.size() == 0)
 			return false;
 
+		// uncomment these lines if using RANSAC-based pose estimation (more
+		// shaking)
 		// Mat inliers = new Mat();
 		// Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix,
 		// distCoeffs, rvec, tvec, false, 500, 2, 16,
 		// inliers, Calib3d.CV_EPNP);
 		Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
 
-		// System.out.println(inliers.dump());
-		// Mat R = new Mat(3, 3, CvType.CV_32FC1);
-		// Calib3d.Rodrigues(rvec, R);
-		// R = R.t();
-		// Calib3d.Rodrigues(R, rvec);
-		// //
-		// Core.multiply(R, new Scalar(-1), R);
-		// // Calib3d.Rodrigues(R, rvec);
-		//
-		// //
-		// Core.gemm(R, tvec, 1, new Mat(), 0, tvec, 0);
-		// System.out.println(tvec.dump() + " " + rvec.dump());
 		return true;
 
 	}
 
 }
 
+/**
+ * Helper class to convert and OpenCV Mat containing a camera image to
+ * NyARRGBRaster
+ *
+ */
 class NyARImageHelper extends NyARRgbRaster {
 
+	/**
+	 * @param image
+	 * @return
+	 */
 	public static INyARRgbRaster createFromMat(Mat image) {
 		BufferedImage bimg;
 		if (image != null) {
@@ -209,7 +202,14 @@ class NyARImageHelper extends NyARRgbRaster {
 
 	}
 
-	public NyARImageHelper(int i_width, int i_height, int i_raster_type, boolean i_is_alloc) throws NyARException {
+	/**
+	 * @param i_width
+	 * @param i_height
+	 * @param i_raster_type
+	 * @param i_is_alloc
+	 * @throws NyARException
+	 */
+	private NyARImageHelper(int i_width, int i_height, int i_raster_type, boolean i_is_alloc) throws NyARException {
 
 		super(i_width, i_height, i_raster_type, i_is_alloc);
 	}

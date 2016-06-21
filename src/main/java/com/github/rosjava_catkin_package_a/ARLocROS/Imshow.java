@@ -30,6 +30,11 @@ import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+/**
+ * Helper class to display an OpenCV image represented as a Mat using only one
+ * function call.
+ *
+ */
 public class Imshow {
 
 	private static Imshow frame;
@@ -56,8 +61,11 @@ public class Imshow {
 
 	}
 
-	public static void show(Mat mat) {
-		Dimension frameSize = new Dimension(mat.rows(), mat.cols());
+	/**
+	 * @param opencvImage
+	 */
+	public static void show(Mat opencvImage) {
+		Dimension frameSize = new Dimension(opencvImage.rows(), opencvImage.cols());
 		if (frame != null)
 			frame.Window.dispose();
 		frame = new Imshow("", frameSize.height, frameSize.width);
@@ -65,23 +73,23 @@ public class Imshow {
 
 		frame.Window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 		if (frame.SizeCustom) {
-			Imgproc.resize(mat, mat, new Size(frame.Height, frame.Width));
+			Imgproc.resize(opencvImage, opencvImage, new Size(frame.Height, frame.Width));
 		}
 
 		BufferedImage bufImage = null;
 		try {
 
 			int type = BufferedImage.TYPE_BYTE_GRAY;
-			if (mat.channels() > 1) {
+			if (opencvImage.channels() > 1) {
 				type = BufferedImage.TYPE_3BYTE_BGR;
 			}
-			int bufferSize = mat.channels() * mat.cols() * mat.rows();
+			int bufferSize = opencvImage.channels() * opencvImage.cols() * opencvImage.rows();
 			byte[] b = new byte[bufferSize];
-			mat.get(0, 0, b);
-			BufferedImage image = new BufferedImage(mat.cols(), mat.rows(), type);
-			final byte[] targetPixels = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+			opencvImage.get(0, 0, b);
+			BufferedImage bufferedImage = new BufferedImage(opencvImage.cols(), opencvImage.rows(), type);
+			final byte[] targetPixels = ((DataBufferByte) bufferedImage.getRaster().getDataBuffer()).getData();
 			System.arraycopy(b, 0, targetPixels, 0, b.length);
-			bufImage = image;
+			bufImage = bufferedImage;
 			frame.image.setImage(bufImage);
 			frame.Window.pack();
 			frame.label.updateUI();

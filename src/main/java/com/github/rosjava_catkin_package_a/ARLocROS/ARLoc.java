@@ -32,7 +32,6 @@ import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
-import org.ros.node.NodeMain;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 
@@ -47,14 +46,14 @@ import tf2_msgs.TFMessage;
 import visualization_msgs.Marker;
 
 /**
- * A simple {@link Publisher} {@link NodeMain}.
+ * Main Class of the ARLocROS Node setting up publishers and subscribers. Note
+ * the TF lookup implementation based on Transformer by Lorenz Moesenlechner.
  */
 public class ARLoc extends AbstractNodeMain {
 	private CameraParams camp;
 	private Mat image;
 	private Mat rvec;
 	private MatOfDouble tvec;
-	// private Jogl3DView jt;
 
 	private Transformer transformer = new Transformer();
 	private String PATTERN_DIR;
@@ -63,24 +62,20 @@ public class ARLoc extends AbstractNodeMain {
 	private String CAMERA_IMAGE_TOPIC;
 	private String CAMERA_INFO_TOPIC;
 	private String MARKER_CONFIG_FILE;
+	private MarkerConfig markerConfig;
 
 	@Override
 	public GraphName getDefaultNodeName() {
 		return GraphName.of("rosjava/imshow");
 	}
 
-	public Transformer getTransformer() {
-		return transformer;
-	}
-
-	public void setTransformer(Transformer transformer) {
-		this.transformer = transformer;
-	}
-
 	@Override
 	public void onStart(final ConnectedNode connectedNode) {
-		//
+		// load OpenCV shared library
 		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+
+		// read configuration variables from the ROS Runtime (configured in the
+		// launch file)
 		final Log log = connectedNode.getLog();
 		log.info("Reading parameters");
 		PATTERN_DIR = connectedNode.getParameterTree().getString("/ARLocROS/pattern_dir");
@@ -90,10 +85,13 @@ public class ARLoc extends AbstractNodeMain {
 		CAMERA_IMAGE_TOPIC = connectedNode.getParameterTree().getString("/ARLocROS/camera_image_topic");
 		CAMERA_INFO_TOPIC = connectedNode.getParameterTree().getString("/ARLocROS/camera_info_topic");
 
+		// Read Marker Config
+		markerConfig = MarkerConfig.createFromConfig(MARKER_CONFIG_FILE, PATTERN_DIR);
+
+		// setup rotation vector and translation vector storing output of the
+		// localization
 		rvec = new Mat(3, 1, CvType.CV_64F);
 		tvec = new MatOfDouble(1.0, 1.0, 1.0);
-		// start OpenGL outup
-		// jt = Jogl3DView.start();
 
 		transformer.setPrefix(GraphName.of(connectedNode.getParameterTree().getString("~tf_prefix", "")));
 		Subscriber<TFMessage> tfSubscriber = connectedNode.newSubscriber(GraphName.of("tf"), tf2_msgs.TFMessage._TYPE);
@@ -121,18 +119,16 @@ public class ARLoc extends AbstractNodeMain {
 					try {
 						//
 						image = Utils.matFromImage(message);
+						// uncomment to add more contrast to the image
 						// image.convertTo(image, -1, 2, 0.0);
-						// Imshow.show(image);
 						// setup camera matrix and return vectors
 						Mat cameraMatrix = new Mat(new Size(3, 3), CvType.CV_32FC1);
 						MatOfDouble distCoeffs = new MatOfDouble(new Mat(4, 1, CvType.CV_64FC1));
 						CameraParams.getCameraParamas(cameraMatrix, distCoeffs, camp);
 						// compute pose
 						if (ComputePose.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
-								new Size(camp.width, camp.height), PATTERN_DIR, MARKER_CONFIG_FILE)) {
-							// Imshow.show(image);
-							// log.info("Pose detected!");
-							// jt.showandsafe(rvec, tvec);
+								new Size(camp.width, camp.height), markerConfig)) {
+							// notify publisher threads (pose and tf, see below)
 							synchronized (tvec) {
 								tvec.notifyAll();
 							}
@@ -235,7 +231,7 @@ public class ARLoc extends AbstractNodeMain {
 			protected void loop() throws InterruptedException {
 
 				Thread.sleep(500);
-				List<Point3> points3dlist = MarkerConfig.getUnordered3DPointList();
+				List<Point3> points3dlist = markerConfig.getUnordered3DPointList();
 				int i = 0;
 				for (Point3 p : points3dlist) {
 					Marker markermessage = markerpublisher.newMessage();
@@ -278,26 +274,19 @@ public class ARLoc extends AbstractNodeMain {
 					tvec.wait();
 				}
 
-				QuaternionHelper q = new QuaternionHelper();
-
-				Mat R = new Mat(3, 3, CvType.CV_32FC1);
-				Calib3d.Rodrigues(rvec, R);
-				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
-				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
-				double attitudeZ = Math.asin(R.get(1, 0)[0]);
-				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
-
 				// compute transform map to odom from map to
 				// camera_rgb_optical_frame and odom to camera_rgb_optical_frame
 
 				// map to camera_rgb_optical_frame
 				Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
+				QuaternionHelper q = new QuaternionHelper();
+				Mat R = new Mat(3, 3, CvType.CV_32FC1);
+				Calib3d.Rodrigues(rvec, R);
 				R = R.t();
 
-				// Calib3d.Rodrigues(rvec, R);
-				bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
-				headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
-				attitudeZ = Math.asin(R.get(1, 0)[0]);
+				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
+				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
+				double attitudeZ = Math.asin(R.get(1, 0)[0]);
 				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
 				Core.multiply(R, new Scalar(-1), R);
 				Core.gemm(R, tvec, 1, new Mat(), 0, tvec_map_cam, 0);
@@ -370,21 +359,12 @@ public class ARLoc extends AbstractNodeMain {
 
 				Mat R = new Mat(3, 3, CvType.CV_32FC1);
 				Calib3d.Rodrigues(rvec, R);
+
+				Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
+				R = R.t();
 				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
 				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
 				double attitudeZ = Math.asin(R.get(1, 0)[0]);
-				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
-
-				// compute transform map to odom from map to
-				// camera_rgb_optical_frame and odom to camera_rgb_optical_frame
-
-				// map to camera_rgb_optical_frame
-				Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
-				R = R.t();
-
-				bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
-				headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
-				attitudeZ = Math.asin(R.get(1, 0)[0]);
 				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
 				Core.multiply(R, new Scalar(-1), R);
 				Core.gemm(R, tvec, 1, new Mat(), 0, tvec_map_cam, 0);
@@ -410,13 +390,13 @@ public class ARLoc extends AbstractNodeMain {
 				org.ros.rosjava_geometry.Transform result = org.ros.rosjava_geometry.Transform.identity();
 				result = result.multiply(transform_map_cam);
 				result = result.multiply(transform_cam_base);
-				
+
 				// set information to message
 				geometry_msgs.PoseStamped posestamped = publisher.newMessage();
 				Pose pose = posestamped.getPose();
 				Quaternion orientation = pose.getOrientation();
 				Point point = pose.getPosition();
-				
+
 				point.setX(result.getTranslation().getX());
 
 				point.setY(result.getTranslation().getY());
@@ -428,12 +408,10 @@ public class ARLoc extends AbstractNodeMain {
 				orientation.setY(result.getRotationAndScale().getY());
 				orientation.setZ(result.getRotationAndScale().getZ());
 
-				
 				// frame_id too
 				posestamped.getHeader().setFrameId("map");
 				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
 				publisher.publish(posestamped);
-
 
 			}
 		});

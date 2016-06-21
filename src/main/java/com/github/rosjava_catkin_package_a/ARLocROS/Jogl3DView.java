@@ -111,7 +111,7 @@ public class Jogl3DView extends JPanel
 
 		gl.glBegin(GL2.GL_POINTS);
 
-		List<Point3> points3dlist = MarkerConfig.getUnordered3DPointList();
+		List<Point3> points3dlist = null;//MarkerConfig.getUnordered3DPointList();
 		boolean first = true;
 		for (Point3 fp : points3dlist) {
 			if (first) {

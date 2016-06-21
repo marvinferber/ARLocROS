@@ -19,6 +19,10 @@ package com.github.rosjava_catkin_package_a.ARLocROS;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDouble;
 
+/**
+ * Helper class to setup camera parameters as OpenCV Mat.
+ *
+ */
 public class CameraParams {
 
 	protected double fx;
@@ -33,6 +37,11 @@ public class CameraParams {
 	protected int height;
 	protected String frame_id;
 
+	/**
+	 * @param cameraMatrix
+	 * @param distCoeffs2
+	 * @param camps
+	 */
 	public static void getCameraParamas(Mat cameraMatrix, MatOfDouble distCoeffs2, CameraParams camps) {
 		cameraMatrix.put(0, 0, camps.fx);
 		cameraMatrix.put(0, 1, 0);

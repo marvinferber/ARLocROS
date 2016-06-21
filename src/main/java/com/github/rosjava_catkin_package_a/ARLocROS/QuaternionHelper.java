@@ -16,12 +16,13 @@
 
 package com.github.rosjava_catkin_package_a.ARLocROS;
 
-
+/**
+ * Quaternion class with useful helper functions to convert from Euler angles.
+ *
+ */
 public class QuaternionHelper {
 	private double x, y, z, w;
 
-	
-	
 	public QuaternionHelper() {
 		x = y = z = 0;
 		w = 1.0;
@@ -60,7 +61,7 @@ public class QuaternionHelper {
 	}
 
 	public final QuaternionHelper normalize() {
-		final double norm =  Math.sqrt(w * w + x * x + y * y + z * z);
+		final double norm = Math.sqrt(w * w + x * x + y * y + z * z);
 
 		final double invNorm = 1.0 / norm;
 		w *= invNorm;
@@ -71,28 +72,28 @@ public class QuaternionHelper {
 		return this;
 	}
 
+	/**
+	 * @param bankX
+	 * @param headingY
+	 * @param attitudeZ
+	 * @return
+	 */
 	public final QuaternionHelper setFromEuler(final double bankX, final double headingY, final double attitudeZ) {
 
 		double angle = headingY * 0.5;
-		final double sinHeadingY = (double) Math.sin(angle);
-		final double cosHeadingY = (double) Math.cos(angle);
+		final double sinHeadingY = Math.sin(angle);
+		final double cosHeadingY = Math.cos(angle);
 		angle = attitudeZ * 0.5;
-		final double sinAttitudeZ = (double) Math.sin(angle);
-		final double cosAttitudeZ = (double) Math.cos(angle);
+		final double sinAttitudeZ = Math.sin(angle);
+		final double cosAttitudeZ = Math.cos(angle);
 		angle = bankX * 0.5;
-		final double sinBankX = (double) Math.sin(angle);
-		final double cosBankX = (double) Math.cos(angle);
+		final double sinBankX = Math.sin(angle);
+		final double cosBankX = Math.cos(angle);
 
-		// variables used to reduce multiplication calls.
-		final double cosHeadingXcosAttitude = cosHeadingY * cosAttitudeZ;
-		final double sinHeadingXsinAttitude = sinHeadingY * sinAttitudeZ;
-		final double cosHeadingXsinAttitude = cosHeadingY * sinAttitudeZ;
-		final double sinHeadingXcosAttitude = sinHeadingY * cosAttitudeZ;
-
-		w = cosHeadingXcosAttitude * cosBankX - sinHeadingXsinAttitude * sinBankX;
-		x = cosHeadingXcosAttitude * sinBankX + sinHeadingXsinAttitude * cosBankX;
-		y = sinHeadingXcosAttitude * cosBankX + cosHeadingXsinAttitude * sinBankX;
-		z = cosHeadingXsinAttitude * cosBankX - sinHeadingXcosAttitude * sinBankX;
+		w = (cosHeadingY * cosAttitudeZ) * cosBankX - (sinHeadingY * sinAttitudeZ) * sinBankX;
+		x = (cosHeadingY * cosAttitudeZ) * sinBankX + (sinHeadingY * sinAttitudeZ) * cosBankX;
+		y = (sinHeadingY * cosAttitudeZ) * cosBankX + (cosHeadingY * sinAttitudeZ) * sinBankX;
+		z = (cosHeadingY * sinAttitudeZ) * cosBankX - (sinHeadingY * cosAttitudeZ) * sinBankX;
 		return normalize();
 
 	}
