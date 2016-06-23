@@ -138,11 +138,14 @@ public class ComputePose {
 
 		// uncomment these lines if using RANSAC-based pose estimation (more
 		// shaking)
-		// Mat inliers = new Mat();
+		Mat inliers = new Mat();
+		
+		Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec, false, 300, 5, 16,
+				inliers, Calib3d.CV_P3P);
+		ARLoc.getLog().info("Points detected: " + points2dlist.size()+ " inliers: "+inliers.size());
+	
 		// Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix,
-		// distCoeffs, rvec, tvec, false, 500, 2, 16,
-		// inliers, Calib3d.CV_EPNP);
-		Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
+		// distCoeffs, rvec, tvec);
 
 		return true;
 

@@ -29,6 +29,7 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.ros.concurrent.CancellableLoop;
 import org.ros.message.MessageListener;
+import org.ros.message.Time;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
@@ -63,6 +64,10 @@ public class ARLoc extends AbstractNodeMain {
 	private String CAMERA_INFO_TOPIC;
 	private String MARKER_CONFIG_FILE;
 	private MarkerConfig markerConfig;
+	protected org.ros.rosjava_geometry.Transform last_pose;
+	protected Time last_timestamp;
+	private boolean BAD_POSE_REJECT;
+	private static Log log;
 
 	@Override
 	public GraphName getDefaultNodeName() {
@@ -76,7 +81,7 @@ public class ARLoc extends AbstractNodeMain {
 
 		// read configuration variables from the ROS Runtime (configured in the
 		// launch file)
-		final Log log = connectedNode.getLog();
+		log = connectedNode.getLog();
 		log.info("Reading parameters");
 		PATTERN_DIR = connectedNode.getParameterTree().getString("/ARLocROS/pattern_dir");
 		MARKER_CONFIG_FILE = connectedNode.getParameterTree().getString("/ARLocROS/marker_config_file");
@@ -84,6 +89,7 @@ public class ARLoc extends AbstractNodeMain {
 		CAMERA_FRAME_NAME = connectedNode.getParameterTree().getString("/ARLocROS/camera_frame_name");
 		CAMERA_IMAGE_TOPIC = connectedNode.getParameterTree().getString("/ARLocROS/camera_image_topic");
 		CAMERA_INFO_TOPIC = connectedNode.getParameterTree().getString("/ARLocROS/camera_info_topic");
+		BAD_POSE_REJECT = connectedNode.getParameterTree().getBoolean("/ARLocROS/bad_pose_reject");
 
 		// Read Marker Config
 		markerConfig = MarkerConfig.createFromConfig(MARKER_CONFIG_FILE, PATTERN_DIR);
@@ -169,6 +175,7 @@ public class ARLoc extends AbstractNodeMain {
 		});
 		log.info("Setting up camera parameters");
 
+		// publish tf CAMERA_FRAME_NAME --> MARKER_FRAME_NAME
 		final Publisher<tf2_msgs.TFMessage> publisher1 = connectedNode.newPublisher("tf", tf2_msgs.TFMessage._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
 
@@ -223,6 +230,7 @@ public class ARLoc extends AbstractNodeMain {
 			}
 		});
 
+		// publish Markers
 		final Publisher<visualization_msgs.Marker> markerpublisher = connectedNode.newPublisher("markers",
 				visualization_msgs.Marker._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
@@ -263,6 +271,7 @@ public class ARLoc extends AbstractNodeMain {
 			}
 		});
 
+		// publish tf map --> odom
 		final Publisher<tf2_msgs.TFMessage> tfPublisher_map_to_odom = connectedNode.newPublisher("tf",
 				tf2_msgs.TFMessage._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
@@ -305,8 +314,19 @@ public class ARLoc extends AbstractNodeMain {
 				GraphName targetFrame = GraphName.of("odom");
 				org.ros.rosjava_geometry.Transform transform_cam_odom = null;
 				if (transformer.canTransform(targetFrame, sourceFrame)) {
-					transform_cam_odom = transformer.lookupTransform(targetFrame, sourceFrame);
-
+					try {
+						transform_cam_odom = transformer.lookupTransform(targetFrame, sourceFrame);
+					} catch (Exception e) {
+						e.printStackTrace();
+						log.info("Cloud not get transformation from " + CAMERA_FRAME_NAME + " to "
+								+ "odom! However, will continue..");
+						return;
+					}
+				} else {
+					log.info("Cloud not get transformation from " + CAMERA_FRAME_NAME + " to "
+							+ "odom! However, will continue..");
+					// cancel this loop..no result can be computed
+					return;
 				}
 				// multiply results
 				org.ros.rosjava_geometry.Transform result = org.ros.rosjava_geometry.Transform.identity();
@@ -382,14 +402,59 @@ public class ARLoc extends AbstractNodeMain {
 				GraphName sourceFrame = GraphName.of(CAMERA_FRAME_NAME);
 				GraphName targetFrame = GraphName.of("base_link");
 				org.ros.rosjava_geometry.Transform transform_cam_base = null;
-				if (transformer.canTransform(targetFrame, sourceFrame)) {
-					transform_cam_base = transformer.lookupTransform(targetFrame, sourceFrame);
 
+				if (transformer.canTransform(targetFrame, sourceFrame)) {
+					try {
+						transform_cam_base = transformer.lookupTransform(targetFrame, sourceFrame);
+					} catch (Exception e) {
+						e.printStackTrace();
+						log.info("Cloud not get transformation from " + CAMERA_FRAME_NAME + " to "
+								+ "base_link! However, will continue..");
+						// cancel this loop..no result can be computed
+						return;
+					}
+				} else {
+					log.info("Cloud not get transformation from " + CAMERA_FRAME_NAME + " to "
+							+ "base_link! However, will continue..");
+					// cancel this loop..no result can be computed
+					return;
 				}
+
 				// multiply results
-				org.ros.rosjava_geometry.Transform result = org.ros.rosjava_geometry.Transform.identity();
-				result = result.multiply(transform_map_cam);
-				result = result.multiply(transform_cam_base);
+				org.ros.rosjava_geometry.Transform current_pose = org.ros.rosjava_geometry.Transform.identity();
+				current_pose = current_pose.multiply(transform_map_cam);
+				current_pose = current_pose.multiply(transform_cam_base);
+
+				if (BAD_POSE_REJECT) {
+					// check for plausibility of the pose
+					Time current_timestamp = connectedNode.getCurrentTime();
+					// TODO Unfortunately, we do not have the tf timestamp at
+					// hand
+					// here
+					boolean goodpose = false;
+					double maxspeed = 5;
+					if (current_pose != null && current_timestamp != null) {
+						double distance = Double.MAX_VALUE;
+						if (last_pose != null && last_timestamp != null) {
+							distance = PoseCompare.distance(current_pose, last_pose);
+							double timedelta = PoseCompare.timedelta(current_timestamp, last_timestamp);
+							if ((distance / timedelta) < maxspeed) {
+								last_pose = current_pose;
+								last_timestamp = current_timestamp;
+								goodpose = true;
+							} else
+								log.info("distance " + distance + " time: " + timedelta + " --> Pose rejected");
+
+						} else {
+							last_pose = current_pose;
+							last_timestamp = current_timestamp;
+						}
+					}
+					// bad pose rejection
+					if (!goodpose) {
+						return;
+					}
+				}
 
 				// set information to message
 				geometry_msgs.PoseStamped posestamped = publisher.newMessage();
@@ -397,16 +462,16 @@ public class ARLoc extends AbstractNodeMain {
 				Quaternion orientation = pose.getOrientation();
 				Point point = pose.getPosition();
 
-				point.setX(result.getTranslation().getX());
+				point.setX(current_pose.getTranslation().getX());
 
-				point.setY(result.getTranslation().getY());
+				point.setY(current_pose.getTranslation().getY());
 
-				point.setZ(result.getTranslation().getZ());
+				point.setZ(current_pose.getTranslation().getZ());
 
-				orientation.setW(result.getRotationAndScale().getW());
-				orientation.setX(result.getRotationAndScale().getX());
-				orientation.setY(result.getRotationAndScale().getY());
-				orientation.setZ(result.getRotationAndScale().getZ());
+				orientation.setW(current_pose.getRotationAndScale().getW());
+				orientation.setX(current_pose.getRotationAndScale().getX());
+				orientation.setY(current_pose.getRotationAndScale().getY());
+				orientation.setZ(current_pose.getRotationAndScale().getZ());
 
 				// frame_id too
 				posestamped.getHeader().setFrameId("map");
@@ -415,6 +480,11 @@ public class ARLoc extends AbstractNodeMain {
 
 			}
 		});
+
+	}
+
+	public static Log getLog() {
+		return log;
 
 	}
 
