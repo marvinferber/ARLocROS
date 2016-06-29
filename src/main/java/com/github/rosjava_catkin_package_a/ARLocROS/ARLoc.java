@@ -364,7 +364,7 @@ public class ARLoc extends AbstractNodeMain {
 
 		// Publish Pose
 
-		final Publisher<geometry_msgs.PoseStamped> publisher = connectedNode.newPublisher("arlocros/pose",
+		final Publisher<geometry_msgs.PoseStamped> posePublisher = connectedNode.newPublisher("arlocros/pose",
 				geometry_msgs.PoseStamped._TYPE);
 
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
@@ -457,7 +457,7 @@ public class ARLoc extends AbstractNodeMain {
 				}
 
 				// set information to message
-				geometry_msgs.PoseStamped posestamped = publisher.newMessage();
+				geometry_msgs.PoseStamped posestamped = posePublisher.newMessage();
 				Pose pose = posestamped.getPose();
 				Quaternion orientation = pose.getOrientation();
 				Point point = pose.getPosition();
@@ -476,7 +476,7 @@ public class ARLoc extends AbstractNodeMain {
 				// frame_id too
 				posestamped.getHeader().setFrameId("map");
 				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
-				publisher.publish(posestamped);
+				posePublisher.publish(posestamped);
 
 			}
 		});
