@@ -37,7 +37,6 @@ import org.opencv.core.Size;
 
 import jp.nyatla.nyartoolkit.core.NyARCode;
 import jp.nyatla.nyartoolkit.core.NyARException;
-import jp.nyatla.nyartoolkit.core.param.INyARCameraDistortionFactor;
 import jp.nyatla.nyartoolkit.core.param.NyARCameraDistortionFactorV2;
 import jp.nyatla.nyartoolkit.core.param.NyARParam;
 import jp.nyatla.nyartoolkit.core.param.NyARPerspectiveProjectionMatrix;
@@ -46,7 +45,6 @@ import jp.nyatla.nyartoolkit.core.raster.rgb.NyARRgbRaster;
 import jp.nyatla.nyartoolkit.core.types.NyARBufferType;
 import jp.nyatla.nyartoolkit.core.types.NyARIntPoint2d;
 import jp.nyatla.nyartoolkit.core.types.NyARIntSize;
-import jp.nyatla.nyartoolkit.markersystem.INyARMarkerSystemConfig;
 import jp.nyatla.nyartoolkit.markersystem.NyARMarkerSystem;
 import jp.nyatla.nyartoolkit.markersystem.NyARMarkerSystemConfig;
 import jp.nyatla.nyartoolkit.markersystem.NyARSensor;
@@ -59,6 +57,17 @@ import jp.nyatla.nyartoolkit.markersystem.NyARSensor;
  */
 public class ComputePose {
 
+	private static List<String> markerPatterns;
+	private static Map<Integer, String> patternmap;
+	private static NyARIntSize i_screen_size;
+	private static NyARPerspectiveProjectionMatrix i_projection_mat;
+	private static NyARCameraDistortionFactorV2 i_dist_factor;
+	private static NyARParam i_param;
+	private static NyARMarkerSystemConfig i_config;
+	private static NyARMarkerSystem markerSystemState;
+	private static NyARSensor cameraSensorWrapper;
+	private static int[] ids;
+
 	/**
 	 * @param rvec
 	 * @param tvec
@@ -67,36 +76,43 @@ public class ComputePose {
 	 * @param image2
 	 * @param size
 	 * @param markerConfig
-	 * @return
+	 * @return if the localization was successful
 	 * @throws NyARException
 	 * @throws FileNotFoundException
 	 */
 	public static boolean computePose(Mat rvec, Mat tvec, Mat cameraMatrix, MatOfDouble distCoeffs, Mat image2,
 			Size size, MarkerConfig markerConfig) throws NyARException, FileNotFoundException {
-		// get pattern files from marker config
-		List<String> markerPatterns = markerConfig.getPatternFileList();
-		// create hashmap of correspondences between id and file/pattern name
-		Map<Integer, String> patternmap = new HashMap<>();
-		// create and load camera specific classes
-		NyARIntSize i_screen_size = new NyARIntSize((int) size.width, (int) size.height);
-		NyARPerspectiveProjectionMatrix i_projection_mat = new NyARPerspectiveProjectionMatrix();
-		INyARCameraDistortionFactor i_dist_factor = new NyARCameraDistortionFactorV2();
-		NyARParam i_param = new NyARParam(i_screen_size, i_projection_mat, i_dist_factor);
+
+		// only load the whole configuration once
+		if (markerPatterns == null) {
+			// get pattern files from marker config
+			markerPatterns = markerConfig.getPatternFileList();
+			// create hashmap of correspondences between id and file/pattern
+			// name
+			patternmap = new HashMap<>();
+			// create and load camera specific classes
+			i_screen_size = new NyARIntSize((int) size.width, (int) size.height);
+			i_projection_mat = new NyARPerspectiveProjectionMatrix();
+			i_dist_factor = new NyARCameraDistortionFactorV2();
+			i_param = new NyARParam(i_screen_size, i_projection_mat, i_dist_factor);
+
+			// create new marker system configuration
+			i_config = new NyARMarkerSystemConfig(i_param);
+			markerSystemState = new NyARMarkerSystem(i_config);
+			// Create wrapper that passes cam pictures to marker system
+			cameraSensorWrapper = new NyARSensor(i_screen_size);
+			ids = new int[markerPatterns.size()];
+			for (int i = 0; i < markerPatterns.size(); i++) {
+				// create marker description from pattern file and add to marker
+				// system
+				NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(markerPatterns.get(i)), 16, 16);
+				ids[i] = markerSystemState.addARMarker(code, 25, markerConfig.getMarkerSize());
+				patternmap.put(ids[i], markerPatterns.get(i));
+			}
+		}
+
 		// convert image to NyAR style for processing
 		INyARRgbRaster imageRaster = NyARImageHelper.createFromMat(image2);
-		// create new marker system configuration
-		INyARMarkerSystemConfig i_config = new NyARMarkerSystemConfig(i_param);
-		NyARMarkerSystem markerSystemState = new NyARMarkerSystem(i_config);
-		int[] ids = new int[markerPatterns.size()];
-		for (int i = 0; i < markerPatterns.size(); i++) {
-			// create marker description from pattern file and add to marker
-			// system
-			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(markerPatterns.get(i)), 16, 16);
-			ids[i] = markerSystemState.addARMarker(code, 25, markerConfig.getMarkerSize());
-			patternmap.put(ids[i], markerPatterns.get(i));
-		}
-		// Create wrapper that passes cam pictures to marker system
-		NyARSensor cameraSensorWrapper = new NyARSensor(i_screen_size);
 		cameraSensorWrapper.update(imageRaster);
 		markerSystemState.update(cameraSensorWrapper);
 		// init 3D point list
@@ -141,8 +157,8 @@ public class ComputePose {
 		Mat inliers = new Mat();
 
 		Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec, false, 300, 5, 16,
-				inliers, Calib3d.P3P);
-		ARLoc.getLog().info("Points detected: " + points2dlist.size() + " inliers: " + inliers.size());
+				inliers, Calib3d.CV_P3P);
+		ARLoc.getLog().debug("Points detected: " + points2dlist.size() + " inliers: " + inliers.size());
 		// avoid publish zero pose if localization failed
 		if (inliers.rows() == 0)
 			return false;

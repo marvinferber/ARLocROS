@@ -25,7 +25,7 @@ public class PoseCompare {
 	/**
 	 * @param current_pose
 	 * @param last_pose
-	 * @return
+	 * @return distance between the poses (position)
 	 */
 	public static double distance(Transform current_pose, Transform last_pose) {
 		Vector3 point1 = current_pose.getTranslation();
@@ -38,7 +38,7 @@ public class PoseCompare {
 	/**
 	 * @param current_timestamp
 	 * @param last_timestamp
-	 * @return
+	 * @return signed duration between the timestamps
 	 */
 	public static double timedelta(Time current_timestamp, Time last_timestamp) {
 		long lasttime = last_timestamp.totalNsecs();

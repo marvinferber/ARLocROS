@@ -99,6 +99,8 @@ public class ARLoc extends AbstractNodeMain {
 		rvec = new Mat(3, 1, CvType.CV_64F);
 		tvec = new MatOfDouble(1.0, 1.0, 1.0);
 
+		// start to listen to transform messages in /tf in order to feed the
+		// Transformer and lookup transforms
 		transformer.setPrefix(GraphName.of(connectedNode.getParameterTree().getString("~tf_prefix", "")));
 		Subscriber<TFMessage> tfSubscriber = connectedNode.newSubscriber(GraphName.of("tf"), tf2_msgs.TFMessage._TYPE);
 		tfSubscriber.addMessageListener(new MessageListener<tf2_msgs.TFMessage>() {
@@ -117,6 +119,7 @@ public class ARLoc extends AbstractNodeMain {
 
 			@Override
 			public void onNewMessage(sensor_msgs.Image message) {
+				//
 				if (!message.getEncoding().toLowerCase().equals("rgb8")) {
 					log.error("Sorry, " + message.getEncoding() + " Image encoding is not supported! EXITING");
 					System.exit(-1);
@@ -153,15 +156,13 @@ public class ARLoc extends AbstractNodeMain {
 
 			@Override
 			public void onNewMessage(sensor_msgs.CameraInfo message) {
+				// capture the camera intrinsics once to be used later by solvepnp
 				if (camp == null) {
 					camp = new CameraParams();
 					camp.fx = message.getK()[0];
 					camp.fy = message.getK()[4];
-					;
 					camp.cx = message.getK()[2];
-					;
 					camp.cy = message.getK()[5];
-					;
 					camp.k1 = message.getD()[0];
 					camp.k2 = message.getD()[1];
 					camp.p1 = message.getD()[2];
@@ -176,7 +177,8 @@ public class ARLoc extends AbstractNodeMain {
 		log.info("Setting up camera parameters");
 
 		// publish tf CAMERA_FRAME_NAME --> MARKER_FRAME_NAME
-		final Publisher<tf2_msgs.TFMessage> publisher1 = connectedNode.newPublisher("tf", tf2_msgs.TFMessage._TYPE);
+		final Publisher<tf2_msgs.TFMessage> tfPublisherCamToMarker = connectedNode.newPublisher("tf",
+				tf2_msgs.TFMessage._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
 
 			@Override
@@ -197,15 +199,18 @@ public class ARLoc extends AbstractNodeMain {
 				 * heading = atan2(-m20,m00) attitude = asin(m10) bank =
 				 * atan2(-m12,m11)
 				 */
+				// convert output rotation vector rvec to rotation matrix R
 				Mat R = new Mat(3, 3, CvType.CV_32FC1);
 				Calib3d.Rodrigues(rvec, R);
+				// get rotations around X,Y,Z from rotation matrix R
 				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
 				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
 				double attitudeZ = Math.asin(R.get(1, 0)[0]);
-				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
+				// convert Euler angles to quarternion
+				q.setFromEuler(bankX, headingY, attitudeZ);
 
 				// set information to message
-				TFMessage tfmessage = publisher1.newMessage();
+				TFMessage tfmessage = tfPublisherCamToMarker.newMessage();
 				TransformStamped posestamped = connectedNode.getTopicMessageFactory()
 						.newFromType(geometry_msgs.TransformStamped._TYPE);
 				Transform transform = posestamped.getTransform();
@@ -225,60 +230,71 @@ public class ARLoc extends AbstractNodeMain {
 				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
 				// frame_id too
 				tfmessage.getTransforms().add(posestamped);
-				publisher1.publish(tfmessage);
-				// System.exit(0);
+				tfPublisherCamToMarker.publish(tfmessage);
 			}
 		});
 
 		// publish Markers
-		final Publisher<visualization_msgs.Marker> markerpublisher = connectedNode.newPublisher("markers",
+		final Publisher<visualization_msgs.Marker> markerPublisher = connectedNode.newPublisher("markers",
 				visualization_msgs.Marker._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
 
 			@Override
 			protected void loop() throws InterruptedException {
-
+				// publish markers every 500ms
 				Thread.sleep(500);
+				// get marker points from markerConfig, each marker has 4
+				// vertices
 				List<Point3> points3dlist = markerConfig.getUnordered3DPointList();
 				int i = 0;
 				for (Point3 p : points3dlist) {
-					Marker markermessage = markerpublisher.newMessage();
+					Marker markermessage = markerPublisher.newMessage();
+					// FIXME If the markers are published into an existing frame
+					// (e.g. map or odom) the node will consume very high CPU
+					// and will fail after a short time. The markers are
+					// probably published in the wrong way.
 					markermessage.getHeader().setFrameId(MARKER_FRAME_NAME);
 					markermessage.setId(i);
 					i++;
 					markermessage.setType(visualization_msgs.Marker.SPHERE);
 					markermessage.setAction(visualization_msgs.Marker.ADD);
+					// position
 					double x = p.x;
 					markermessage.getPose().getPosition().setX(x);
 					double y = p.y;
 					markermessage.getPose().getPosition().setY(y);
 					double z = p.z;
 					markermessage.getPose().getPosition().setZ(z);
+					// orientation
 					markermessage.getPose().getOrientation().setX(0);
 					markermessage.getPose().getOrientation().setY(0);
 					markermessage.getPose().getOrientation().setZ(0);
 					markermessage.getPose().getOrientation().setW(1);
+					// size
 					markermessage.getScale().setX(0.1);
 					markermessage.getScale().setY(0.1);
 					markermessage.getScale().setZ(0.1);
+					// color
 					markermessage.getColor().setA(1);
 					markermessage.getColor().setR(1);
 					markermessage.getColor().setG(0);
 					markermessage.getColor().setB(0);
 
-					markerpublisher.publish(markermessage);
+					markerPublisher.publish(markermessage);
 				}
 			}
 		});
 
 		// publish tf map --> odom
-		final Publisher<tf2_msgs.TFMessage> tfPublisher_map_to_odom = connectedNode.newPublisher("tf",
+		final Publisher<tf2_msgs.TFMessage> tfPublisherMapToOdom = connectedNode.newPublisher("tf",
 				tf2_msgs.TFMessage._TYPE);
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
 
 			@Override
 			protected void loop() throws InterruptedException {
 
+				// since this is an infinite loop, wait to be notified if new
+				// image was processed
 				synchronized (tvec) {
 					tvec.wait();
 				}
@@ -289,22 +305,29 @@ public class ARLoc extends AbstractNodeMain {
 				// map to camera_rgb_optical_frame
 				Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
 				QuaternionHelper q = new QuaternionHelper();
+				// get rotation matrix R from solvepnp output rotation vector
+				// rvec
 				Mat R = new Mat(3, 3, CvType.CV_32FC1);
 				Calib3d.Rodrigues(rvec, R);
+				// transpose R, because we need the transformation from
+				// world(map) to camera
 				R = R.t();
-
+				// get rotation around X,Y,Z from R in radiants
 				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
 				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
 				double attitudeZ = Math.asin(R.get(1, 0)[0]);
-				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
-				Core.multiply(R, new Scalar(-1), R);
-				Core.gemm(R, tvec, 1, new Mat(), 0, tvec_map_cam, 0);
+				q.setFromEuler(bankX, headingY, attitudeZ);
+				// compute translation vector from world (map) to cam
+				// tvec_map_cam
+				Core.multiply(R, new Scalar(-1), R); // R=-R
+				Core.gemm(R, tvec, 1, new Mat(), 0, tvec_map_cam, 0); // tvec_map_cam=R*tvec
+
 				org.ros.rosjava_geometry.Quaternion rotation = new org.ros.rosjava_geometry.Quaternion(q.getX(),
 						q.getY(), q.getZ(), q.getW());
 				double x = tvec_map_cam.get(0, 0)[0];
 				double y = tvec_map_cam.get(1, 0)[0];
 				double z = tvec_map_cam.get(2, 0)[0];
-
+				// create a Transform Object that hold the transform map to cam
 				org.ros.rosjava_geometry.Vector3 translation = new org.ros.rosjava_geometry.Vector3(x, y, z);
 				org.ros.rosjava_geometry.Transform transform_map_cam = new org.ros.rosjava_geometry.Transform(
 						translation, rotation);
@@ -333,19 +356,16 @@ public class ARLoc extends AbstractNodeMain {
 				result = result.multiply(transform_map_cam);
 				result = result.multiply(transform_cam_odom);
 
-				// set information to message
-				TFMessage tfmessage = tfPublisher_map_to_odom.newMessage();
+				// set information to ROS message
+				TFMessage tfMessage = tfPublisherMapToOdom.newMessage();
 				TransformStamped transformStamped = connectedNode.getTopicMessageFactory()
 						.newFromType(geometry_msgs.TransformStamped._TYPE);
 				Transform transform = transformStamped.getTransform();
 
 				Quaternion orientation = transform.getRotation();
 				Vector3 vector = transform.getTranslation();
-
 				vector.setX(result.getTranslation().getX());
-
 				vector.setY(result.getTranslation().getY());
-
 				vector.setZ(result.getTranslation().getZ());
 
 				orientation.setW(result.getRotationAndScale().getW());
@@ -356,8 +376,8 @@ public class ARLoc extends AbstractNodeMain {
 				transformStamped.setChildFrameId("odom");
 				transformStamped.getHeader().setStamp(connectedNode.getCurrentTime());
 				// frame_id too
-				tfmessage.getTransforms().add(transformStamped);
-				tfPublisher_map_to_odom.publish(tfmessage);
+				tfMessage.getTransforms().add(transformStamped);
+				tfPublisherMapToOdom.publish(tfMessage);
 				// System.exit(0);
 			}
 		});
@@ -372,20 +392,23 @@ public class ARLoc extends AbstractNodeMain {
 			@Override
 			protected void loop() throws InterruptedException {
 
+				// since this is an infinite loop, wait here to be notified if
+				// new image was processed
 				synchronized (tvec) {
 					tvec.wait();
 				}
 				QuaternionHelper q = new QuaternionHelper();
 
+				// convert rotation vector result of solvepnp to rotation matrix
 				Mat R = new Mat(3, 3, CvType.CV_32FC1);
 				Calib3d.Rodrigues(rvec, R);
-
+				// see publishers before for documentation
 				Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
 				R = R.t();
 				double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
 				double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
 				double attitudeZ = Math.asin(R.get(1, 0)[0]);
-				q.setFromEuler((float) bankX, (float) headingY, (float) attitudeZ);
+				q.setFromEuler(bankX, headingY, attitudeZ);
 				Core.multiply(R, new Scalar(-1), R);
 				Core.gemm(R, tvec, 1, new Mat(), 0, tvec_map_cam, 0);
 				org.ros.rosjava_geometry.Quaternion rotation = new org.ros.rosjava_geometry.Quaternion(q.getX(),
@@ -425,31 +448,31 @@ public class ARLoc extends AbstractNodeMain {
 				current_pose = current_pose.multiply(transform_map_cam);
 				current_pose = current_pose.multiply(transform_cam_base);
 
+				// check for plausibility of the pose by checking if movement
+				// exceeds max speed (defined) of the robot
 				if (BAD_POSE_REJECT) {
-					// check for plausibility of the pose
 					Time current_timestamp = connectedNode.getCurrentTime();
 					// TODO Unfortunately, we do not have the tf timestamp at
-					// hand
-					// here
-					boolean goodpose = false;
+					// hand here. So we can only use the current timestamp.
 					double maxspeed = 5;
-					if (current_pose != null && current_timestamp != null) {
-						double distance = Double.MAX_VALUE;
-						if (last_pose != null && last_timestamp != null) {
-							distance = PoseCompare.distance(current_pose, last_pose);
-							double timedelta = PoseCompare.timedelta(current_timestamp, last_timestamp);
-							if ((distance / timedelta) < maxspeed) {
-								last_pose = current_pose;
-								last_timestamp = current_timestamp;
-								goodpose = true;
-							} else
-								log.info("distance " + distance + " time: " + timedelta + " --> Pose rejected");
-
-						} else {
+					boolean goodpose = false;
+					// if (current_pose != null && current_timestamp != null) {
+					if (last_pose != null && last_timestamp != null) {
+						// check speed of movement between last and current pose
+						double distance = PoseCompare.distance(current_pose, last_pose);
+						double timedelta = PoseCompare.timedelta(current_timestamp, last_timestamp);
+						if ((distance / timedelta) < maxspeed) {
 							last_pose = current_pose;
 							last_timestamp = current_timestamp;
-						}
+							goodpose = true;
+						} else
+							log.info("distance " + distance + " time: " + timedelta + " --> Pose rejected");
+
+					} else {
+						last_pose = current_pose;
+						last_timestamp = current_timestamp;
 					}
+					// }
 					// bad pose rejection
 					if (!goodpose) {
 						return;
@@ -483,6 +506,9 @@ public class ARLoc extends AbstractNodeMain {
 
 	}
 
+	/**
+	 * @return
+	 */
 	public static Log getLog() {
 		return log;
 
