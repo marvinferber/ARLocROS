@@ -43,6 +43,7 @@ import rosjava_tf_example.Transformer;
 import tf2_msgs.TFMessage;
 import visualization_msgs.Marker;
 
+import javax.annotation.Nullable;
 import java.util.List;
 
 /**
@@ -56,16 +57,10 @@ public class ARLoc extends AbstractNodeMain {
     private MatOfDouble tvec;
 
     private Transformer transformer = Transformer.create();
-    private String PATTERN_DIR;
-    private String MARKER_FRAME_NAME;
-    private String CAMERA_FRAME_NAME;
-    private String CAMERA_IMAGE_TOPIC;
-    private String CAMERA_INFO_TOPIC;
-    private String MARKER_CONFIG_FILE;
+    @Nullable private Parameter parameter;
     private MarkerConfig markerConfig;
     protected org.ros.rosjava_geometry.Transform last_pose;
     protected Time last_timestamp;
-    private boolean BAD_POSE_REJECT;
     private static Log log;
 
     @Override
@@ -82,16 +77,10 @@ public class ARLoc extends AbstractNodeMain {
         // launch file)
         log = connectedNode.getLog();
         log.info("Reading parameters");
-        PATTERN_DIR = connectedNode.getParameterTree().getString("/ARLocROS/pattern_dir");
-        MARKER_CONFIG_FILE = connectedNode.getParameterTree().getString("/ARLocROS/marker_config_file");
-        MARKER_FRAME_NAME = connectedNode.getParameterTree().getString("/ARLocROS/marker_frame_name");
-        CAMERA_FRAME_NAME = connectedNode.getParameterTree().getString("/ARLocROS/camera_frame_name");
-        CAMERA_IMAGE_TOPIC = connectedNode.getParameterTree().getString("/ARLocROS/camera_image_topic");
-        CAMERA_INFO_TOPIC = connectedNode.getParameterTree().getString("/ARLocROS/camera_info_topic");
-        BAD_POSE_REJECT = connectedNode.getParameterTree().getBoolean("/ARLocROS/bad_pose_reject");
+        this.parameter = Parameter.createFromParameterTree(connectedNode.getParameterTree());
 
         // Read Marker Config
-        markerConfig = MarkerConfig.createFromConfig(MARKER_CONFIG_FILE, PATTERN_DIR);
+        markerConfig = MarkerConfig.createFromConfig(parameter.markerConfigFile(), parameter.patternDirectory());
 
         // setup rotation vector and translation vector storing output of the
         // localization
@@ -112,7 +101,7 @@ public class ARLoc extends AbstractNodeMain {
         });
 
         // Subscribe to Image
-        Subscriber<sensor_msgs.Image> subscriberToImage = connectedNode.newSubscriber(CAMERA_IMAGE_TOPIC,
+        Subscriber<sensor_msgs.Image> subscriberToImage = connectedNode.newSubscriber(parameter.cameraImageTopic(),
                 sensor_msgs.Image._TYPE);
         subscriberToImage.addMessageListener(new MessageListener<sensor_msgs.Image>() {
 
@@ -149,7 +138,7 @@ public class ARLoc extends AbstractNodeMain {
             }
         });
         // Subscribe to camera info
-        Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(CAMERA_INFO_TOPIC,
+        Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(parameter.cameraInfoTopic(),
                 sensor_msgs.CameraInfo._TYPE);
         subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
 
@@ -224,8 +213,8 @@ public class ARLoc extends AbstractNodeMain {
                 orientation.setX(q.getX());
                 orientation.setY(q.getY());
                 orientation.setZ(q.getZ());
-                posestamped.getHeader().setFrameId(CAMERA_FRAME_NAME);
-                posestamped.setChildFrameId(MARKER_FRAME_NAME);
+                posestamped.getHeader().setFrameId(parameter.cameraFrameName());
+                posestamped.setChildFrameId(parameter.markerFrameName());
                 posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
                 // frame_id too
                 tfmessage.getTransforms().add(posestamped);
@@ -252,7 +241,7 @@ public class ARLoc extends AbstractNodeMain {
                     // (e.g. map or odom) the node will consume very high CPU
                     // and will fail after a short time. The markers are
                     // probably published in the wrong way.
-                    markermessage.getHeader().setFrameId(MARKER_FRAME_NAME);
+                    markermessage.getHeader().setFrameId(parameter.markerFrameName());
                     markermessage.setId(i);
                     i++;
                     markermessage.setType(visualization_msgs.Marker.SPHERE);
@@ -332,7 +321,7 @@ public class ARLoc extends AbstractNodeMain {
                         translation, rotation);
 
                 // odom to camera_rgb_optical_frame
-                GraphName sourceFrame = GraphName.of(CAMERA_FRAME_NAME);
+                GraphName sourceFrame = GraphName.of(parameter.cameraFrameName());
                 GraphName targetFrame = GraphName.of("odom");
                 org.ros.rosjava_geometry.Transform transform_cam_odom = null;
                 if (transformer.canTransform(targetFrame, sourceFrame)) {
@@ -340,14 +329,13 @@ public class ARLoc extends AbstractNodeMain {
                         transform_cam_odom = transformer.lookupTransform(targetFrame, sourceFrame);
                     } catch (Exception e) {
                         e.printStackTrace();
-                        log.info(
-                                "Cloud not get transformation from " + CAMERA_FRAME_NAME + " to " + "odom! However, " +
-                                        "will continue..");
+                        log.info("Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! However, " +
+                                "will continue..");
                         return;
                     }
                 } else {
                     log.info(
-                            "Cloud not get transformation from " + CAMERA_FRAME_NAME + " to " + "odom! However, will " +
+                            "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! However, will " +
                                     "continue..");
                     // cancel this loop..no result can be computed
                     return;
@@ -423,7 +411,7 @@ public class ARLoc extends AbstractNodeMain {
                         translation, rotation);
 
                 // odom to camera_rgb_optical_frame
-                GraphName sourceFrame = GraphName.of(CAMERA_FRAME_NAME);
+                GraphName sourceFrame = GraphName.of(parameter.cameraFrameName());
                 GraphName targetFrame = GraphName.of("base_link");
                 org.ros.rosjava_geometry.Transform transform_cam_base = null;
 
@@ -433,13 +421,15 @@ public class ARLoc extends AbstractNodeMain {
                     } catch (Exception e) {
                         e.printStackTrace();
                         log.info(
-                                "Cloud not get transformation from " + CAMERA_FRAME_NAME + " to " + "base_link! However, will continue..");
+                                "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "base_link! " +
+                                        "However, will continue..");
                         // cancel this loop..no result can be computed
                         return;
                     }
                 } else {
                     log.info(
-                            "Cloud not get transformation from " + CAMERA_FRAME_NAME + " to " + "base_link! However, will continue..");
+                            "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "base_link! However, " +
+                                    "will continue..");
                     // cancel this loop..no result can be computed
                     return;
                 }
@@ -451,7 +441,7 @@ public class ARLoc extends AbstractNodeMain {
 
                 // check for plausibility of the pose by checking if movement
                 // exceeds max speed (defined) of the robot
-                if (BAD_POSE_REJECT) {
+                if (parameter.badPoseReject()) {
                     Time current_timestamp = connectedNode.getCurrentTime();
                     // TODO Unfortunately, we do not have the tf timestamp at
                     // hand here. So we can only use the current timestamp.
