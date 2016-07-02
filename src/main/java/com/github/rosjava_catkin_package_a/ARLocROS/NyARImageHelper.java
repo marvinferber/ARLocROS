@@ -14,26 +14,26 @@ import java.awt.image.DataBufferByte;
  * NyARRGBRaster
  *
  */
-public class NyARImageHelper extends NyARRgbRaster {
+public final class NyARImageHelper extends NyARRgbRaster {
 
     /**
      * @param image
      * @return
      */
     public static INyARRgbRaster createFromMat(Mat image) {
-        BufferedImage bimg;
+        final BufferedImage bimg;
         if (image != null) {
-            int cols = image.cols();
-            int rows = image.rows();
-            int elemSize = (int) image.elemSize();
-            byte[] data = new byte[cols * rows * elemSize];
-            int type;
+            final int cols = image.cols();
+            final int rows = image.rows();
+            final int elemSize = (int) image.elemSize();
+            final byte[] data = new byte[cols * rows * elemSize];
+            final int type;
             image.get(0, 0, data);
             // we only support RGB
             type = BufferedImage.TYPE_3BYTE_BGR;
             // bgr to rgb
             byte b;
-            for (int i = 0; i < data.length; i = i + 3) {
+            for (int i = 0; i < data.length; i += 3) {
                 b = data[i];
                 data[i] = data[i + 2];
                 data[i + 2] = b;
@@ -48,7 +48,7 @@ public class NyARImageHelper extends NyARRgbRaster {
 
         NyARImageHelper ra = null;
 
-        int raster_type = NyARBufferType.BYTE1D_B8G8R8_24;
+        final int raster_type = NyARBufferType.BYTE1D_B8G8R8_24;
         try {
             ra = new NyARImageHelper(bimg.getWidth(), bimg.getHeight(), raster_type, false);
             ra._buf = ((DataBufferByte) (bimg.getRaster().getDataBuffer())).getData();
