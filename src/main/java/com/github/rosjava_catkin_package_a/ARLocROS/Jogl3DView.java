@@ -56,7 +56,7 @@ public class Jogl3DView extends JPanel
 		display.setPreferredSize(new Dimension(dispWidth, dispHeight)); // TODO:
 																		// set
 																		// display
-		// size here
+		// patterntSize here
 		display.addGLEventListener(this);
 		setLayout(new BorderLayout());
 		add(display, BorderLayout.CENTER);

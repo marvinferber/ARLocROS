@@ -258,7 +258,7 @@ public class ARLoc extends AbstractNodeMain {
                     markermessage.getPose().getOrientation().setY(0);
                     markermessage.getPose().getOrientation().setZ(0);
                     markermessage.getPose().getOrientation().setW(1);
-                    // size
+                    // patterntSize
                     markermessage.getScale().setX(0.1);
                     markermessage.getScale().setY(0.1);
                     markermessage.getScale().setZ(0.1);

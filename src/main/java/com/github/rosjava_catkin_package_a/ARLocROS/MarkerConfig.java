@@ -26,74 +26,77 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MarkerConfig {
+public final class MarkerConfig {
 
-    Map<String, Marker> map = null;
-    float size = 0;
+    private final Map<String, Marker> map = new HashMap<>();
+    private final float patterntSize;
 
-    public static MarkerConfig createFromConfig(String configfile, String pATTERN_DIR) {
-        MarkerConfig mc = new MarkerConfig();
-        Map<String, Marker> map = new HashMap<>();
+    private MarkerConfig(String configfile, String patternDirectory) {
         float size = 0;
-        // List<String> patternlist = new ArrayList<>();
         try {
-            BufferedReader fr = new BufferedReader(new FileReader(configfile));
-            String s;
-            while ((s = fr.readLine()) != null) {
-                if (s.contains("markersize")) {
-                    size = Float.parseFloat(s.split(" ")[1]);
-                    // System.out.println(s+" "+Float.parseFloat(s.split("
-                    // ")[1]));
-                }
-                if (s.contains("patt")) {
-                    try {
-                        String[] values = s.split(" ");
-                        float x = Float.parseFloat(values[0]);
-                        float y = Float.parseFloat(values[1]);
-                        float z = Float.parseFloat(values[2]);
-
-                        String pattern = pATTERN_DIR + values[3];
-                        final Marker marker = Marker.builder()
-                                .patternFile(pattern)
-                                .upperleft(new Point3(x, y, z))
-                                .upperright(new Point3(x + size, y, z))
-                                .lowerright(new Point3(x + size, y - size, z))
-                                .lowerleft(new Point3(x, y - size, z))
-                                .build();
-
-                        map.put(pattern, marker);
-                        // patternlist.add(pattern);
-                        // System.out.println("Adding pattern "+pattern);
-                    } catch (NumberFormatException e) {
-                        continue;
-                    }
-                }
-            } fr.close();
+            final BufferedReader bufferedReader = new BufferedReader(new FileReader(configfile));
+            String line = bufferedReader.readLine();
+            while (line != null) {
+                size = readPatternSizeFromLine(size, line);
+                readPatternFromLine(patternDirectory, size, line);
+                line = bufferedReader.readLine();
+            }
+            bufferedReader.close();
         } catch (IOException e) {
             e.printStackTrace();
-        } mc.setPatternMap(map);
-        mc.setPatternSize(size);
-        return mc;
+        }
+
+        patterntSize = size;
     }
 
-    private void setPatternSize(float size2) {
-        this.size = size2;
-
+    public static MarkerConfig createFromConfig(String configfile, String patternDirectory) {
+        return new MarkerConfig(configfile, patternDirectory);
     }
 
-    private void setPatternMap(Map<String, Marker> map2) {
-        this.map = map2;
+    private void readPatternFromLine(String patternDirectory, float size, String line) {
+        if (line.contains("patt")) {
+            try {
+                final String[] values = line.split(" ");
+                final float x = Float.parseFloat(values[0]);
+                final float y = Float.parseFloat(values[1]);
+                final float z = Float.parseFloat(values[2]);
 
+                final String pattern = patternDirectory + values[3];
+                final Marker marker = Marker.builder()
+                        .patternFile(pattern)
+                        .upperleft(new Point3(x, y, z))
+                        .upperright(new Point3(x + size, y, z))
+                        .lowerright(new Point3(x + size, y - size, z))
+                        .lowerleft(new Point3(x, y - size, z))
+                        .build();
+
+                map.put(pattern, marker);
+                // patternlist.add(pattern);
+                // System.out.println("Adding pattern "+pattern);
+            } catch (NumberFormatException e) {
+                return;
+            }
+        }
+    }
+
+    private static float readPatternSizeFromLine(float size, String line) {
+        float newSize = size;
+        if (line.contains("markersize")) {
+            newSize = Float.parseFloat(line.split(" ")[1]);
+            // System.out.println(s+" "+Float.parseFloat(s.split("
+            // ")[1]));
+        }
+        return newSize;
     }
 
     public List<Point3> create3dpointlist(String string) {
         if (map != null && map.containsKey(string)) {
-            Marker m = map.get(string);
-            List<Point3> list = new ArrayList<Point3>();
-            list.add(m.upperleft());
-            list.add(m.upperright());
-            list.add(m.lowerright());
-            list.add(m.lowerleft());
+            final Marker marker = map.get(string);
+            final List<Point3> list = new ArrayList<>();
+            list.add(marker.upperleft());
+            list.add(marker.upperright());
+            list.add(marker.lowerright());
+            list.add(marker.lowerleft());
             return list;
         } else {
             return null;
@@ -117,7 +120,7 @@ public class MarkerConfig {
     }
 
     public float getMarkerSize() {
-        return size;
+        return patterntSize;
     }
 
     public List<String> getPatternFileList() {
