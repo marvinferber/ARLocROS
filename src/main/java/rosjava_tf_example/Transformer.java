@@ -62,7 +62,7 @@ public final class Transformer {
      * @param transform the transform to add
      */
     public void updateTransform(TransformStamped transform) {
-        GraphName frame = GraphName.of(transform.getChildFrameId());
+        final GraphName frame = GraphName.of(transform.getChildFrameId());
         transforms.put(makeFullyQualified(frame), transform);
     }
 

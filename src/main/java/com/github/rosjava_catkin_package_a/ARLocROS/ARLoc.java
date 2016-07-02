@@ -90,7 +90,7 @@ public class ARLoc extends AbstractNodeMain {
         // start to listen to transform messages in /tf in order to feed the
         // Transformer and lookup transforms
         transformer.setPrefix(GraphName.of(connectedNode.getParameterTree().getString("~tf_prefix", "")));
-        Subscriber<TFMessage> tfSubscriber = connectedNode.newSubscriber(GraphName.of("tf"), tf2_msgs.TFMessage._TYPE);
+        final Subscriber<TFMessage> tfSubscriber = connectedNode.newSubscriber(GraphName.of("tf"), tf2_msgs.TFMessage._TYPE);
         tfSubscriber.addMessageListener(new MessageListener<tf2_msgs.TFMessage>() {
             @Override
             public void onNewMessage(TFMessage message) {
