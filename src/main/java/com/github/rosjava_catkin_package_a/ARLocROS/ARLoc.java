@@ -39,7 +39,6 @@ import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
-import rosjava_tf_example.Transformer;
 import tf2_msgs.TFMessage;
 import visualization_msgs.Marker;
 
@@ -56,7 +55,6 @@ public class ARLoc extends AbstractNodeMain {
     private Mat rvec;
     private MatOfDouble tvec;
 
-    private Transformer transformer = Transformer.create();
     @Nullable private Parameter parameter;
     private MarkerConfig markerConfig;
     protected org.ros.rosjava_geometry.Transform last_pose;
@@ -89,16 +87,7 @@ public class ARLoc extends AbstractNodeMain {
 
         // start to listen to transform messages in /tf in order to feed the
         // Transformer and lookup transforms
-        transformer.setPrefix(GraphName.of(connectedNode.getParameterTree().getString("~tf_prefix", "")));
-        final Subscriber<TFMessage> tfSubscriber = connectedNode.newSubscriber(GraphName.of("tf"), tf2_msgs.TFMessage._TYPE);
-        tfSubscriber.addMessageListener(new MessageListener<tf2_msgs.TFMessage>() {
-            @Override
-            public void onNewMessage(TFMessage message) {
-                for (TransformStamped transform : message.getTransforms()) {
-                    transformer.updateTransform(transform);
-                }
-            }
-        });
+        final TransformationService transformationService = TransformationService.create(connectedNode);
 
         // Subscribe to Image
         Subscriber<sensor_msgs.Image> subscriberToImage = connectedNode.newSubscriber(parameter.cameraImageTopic(),
@@ -138,8 +127,8 @@ public class ARLoc extends AbstractNodeMain {
             }
         });
         // Subscribe to camera info
-        Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(parameter.cameraInfoTopic(),
-                sensor_msgs.CameraInfo._TYPE);
+        Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(
+                parameter.cameraInfoTopic(), sensor_msgs.CameraInfo._TYPE);
         subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
 
             @Override
@@ -324,18 +313,21 @@ public class ARLoc extends AbstractNodeMain {
                 GraphName sourceFrame = GraphName.of(parameter.cameraFrameName());
                 GraphName targetFrame = GraphName.of("odom");
                 org.ros.rosjava_geometry.Transform transform_cam_odom = null;
-                if (transformer.canTransform(targetFrame, sourceFrame)) {
+                if (transformationService.canTransform(targetFrame, sourceFrame)) {
                     try {
-                        transform_cam_odom = transformer.lookupTransform(targetFrame, sourceFrame);
+                        transform_cam_odom = transformationService.lookupTransform(targetFrame, sourceFrame);
                     } catch (Exception e) {
                         e.printStackTrace();
-                        log.info("Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! However, " +
-                                "will continue..");
+                        log.info(
+                                "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! " +
+                                        "However, " +
+                                        "will continue..");
                         return;
                     }
                 } else {
                     log.info(
-                            "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! However, will " +
+                            "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! " +
+                                    "However, will " +
                                     "continue..");
                     // cancel this loop..no result can be computed
                     return;
@@ -415,20 +407,22 @@ public class ARLoc extends AbstractNodeMain {
                 GraphName targetFrame = GraphName.of("base_link");
                 org.ros.rosjava_geometry.Transform transform_cam_base = null;
 
-                if (transformer.canTransform(targetFrame, sourceFrame)) {
+                if (transformationService.canTransform(targetFrame, sourceFrame)) {
                     try {
-                        transform_cam_base = transformer.lookupTransform(targetFrame, sourceFrame);
+                        transform_cam_base = transformationService.lookupTransform(targetFrame, sourceFrame);
                     } catch (Exception e) {
                         e.printStackTrace();
                         log.info(
-                                "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "base_link! " +
+                                "Cloud not get transformation from " + parameter.cameraFrameName() + " to " +
+                                        "base_link! " +
                                         "However, will continue..");
                         // cancel this loop..no result can be computed
                         return;
                     }
                 } else {
                     log.info(
-                            "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "base_link! However, " +
+                            "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "base_link!" +
+                                    " However, " +
                                     "will continue..");
                     // cancel this loop..no result can be computed
                     return;
