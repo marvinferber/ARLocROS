@@ -1,19 +1,42 @@
 package com.github.rosjava_catkin_package_a.ARLocROS;
 
+import com.google.auto.value.AutoValue;
 import org.opencv.core.Point3;
 
 /**
  * @author Hoang Tung Dinh
  */
-public class Marker {
+@AutoValue
+public abstract class Marker {
 
-    public Marker(String patternFile) {
-        this.patternFile = patternFile;
+    Marker() {}
+
+    abstract String patternFile();
+
+    abstract Point3 upperleft();
+
+    abstract Point3 upperright();
+
+    abstract Point3 lowerright();
+
+    abstract Point3 lowerleft();
+
+    static Builder builder() {
+        return new AutoValue_Marker.Builder();
     }
 
-    String patternFile;
-    Point3 upperleft;
-    Point3 upperright;
-    Point3 lowerright;
-    Point3 lowerleft;
+    @AutoValue.Builder
+    abstract static class Builder {
+        abstract Builder patternFile(String value);
+
+        abstract Builder upperleft(Point3 value);
+
+        abstract Builder upperright(Point3 value);
+
+        abstract Builder lowerright(Point3 value);
+
+        abstract Builder lowerleft(Point3 value);
+
+        abstract Marker build();
+    }
 }
