@@ -61,8 +61,15 @@ public final class ComputePose {
     private final NyARMarkerSystem markerSystemState;
     private final NyARSensor cameraSensorWrapper;
     private final int[] ids;
+    private final MarkerConfig markerConfig;
+    private final Mat cameraMatrix;
+    private final MatOfDouble distCoeffs;
 
-    private ComputePose(MarkerConfig markerConfig, Size size) throws NyARException, FileNotFoundException {
+    private ComputePose(MarkerConfig markerConfig, Size size, Mat cameraMatrix,
+            MatOfDouble distCoeffs) throws NyARException, FileNotFoundException {
+        this.markerConfig = markerConfig;
+        this.cameraMatrix = cameraMatrix;
+        this.distCoeffs = distCoeffs;
         // only load the whole configuration once
         // get pattern files from marker config
         markerPatterns = markerConfig.getPatternFileList();
@@ -90,12 +97,12 @@ public final class ComputePose {
         }
     }
 
-    public static ComputePose create(MarkerConfig markerConfig, Size size) throws NyARException, FileNotFoundException {
-        return new ComputePose(markerConfig, size);
+    public static ComputePose create(MarkerConfig markerConfig, Size size, Mat cameraMatrix,
+            MatOfDouble distCoeffs) throws NyARException, FileNotFoundException {
+        return new ComputePose(markerConfig, size, cameraMatrix, distCoeffs);
     }
 
-    public boolean computePose(Mat rvec, Mat tvec, Mat cameraMatrix, MatOfDouble distCoeffs, Mat image2, Size size,
-            MarkerConfig markerConfig) throws NyARException, FileNotFoundException {
+    public boolean computePose(Mat rvec, Mat tvec, Mat image2) throws NyARException, FileNotFoundException {
         // convert image to NyAR style for processing
         final INyARRgbRaster imageRaster = NyARImageHelper.createFromMat(image2);
         cameraSensorWrapper.update(imageRaster);

@@ -107,7 +107,10 @@ public class ARLoc extends AbstractNodeMain {
 
         ComputePose computePose = null;
         try {
-            computePose = ComputePose.create(markerConfig, new Size(camp.width(), camp.height()));
+            final Mat cameraMatrix = CameraParams.getCameraMatrix(camp);
+            final MatOfDouble distCoeffs = CameraParams.getDistCoeffs(camp);
+            computePose = ComputePose.create(markerConfig, new Size(camp.width(), camp.height()), cameraMatrix,
+                    distCoeffs);
         } catch (NyARException e) {
             logger.info("Cannot initialize ComputePose", e);
         } catch (FileNotFoundException e) {
@@ -130,11 +133,8 @@ public class ARLoc extends AbstractNodeMain {
                         // uncomment to add more contrast to the image
                         // image.convertTo(image, -1, 2, 0.0);
                         // setup camera matrix and return vectors
-                        final Mat cameraMatrix = CameraParams.getCameraMatrix(camp);
-                        final MatOfDouble distCoeffs = CameraParams.getDistCoeffs(camp);
                         // compute pose
-                        if (poseProcessor.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
-                                new Size(camp.width(), camp.height()), markerConfig)) {
+                        if (poseProcessor.computePose(rvec, tvec, image)) {
                             // notify publisher threads (pose and tf, see below)
                             synchronized (tvec) {
                                 tvec.notifyAll();
@@ -485,9 +485,10 @@ public class ARLoc extends AbstractNodeMain {
 
     }
 
-    private static CameraParams getCameraInfo(ConnectedNode connectedNode, Parameter parameter) {// Subscribe to camera info
-        Subscriber<CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(
-                parameter.cameraInfoTopic(), CameraInfo._TYPE);
+    private static CameraParams getCameraInfo(ConnectedNode connectedNode,
+            Parameter parameter) {// Subscribe to camera info
+        Subscriber<CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(parameter.cameraInfoTopic(),
+                CameraInfo._TYPE);
         final CameraInfoService cameraInfoService = CameraInfoService.create(subscriberToCameraInfo);
         Optional<CameraParams> cameraParamsOptional = cameraInfoService.getCameraParams();
         while (!cameraParamsOptional.isPresent()) {
