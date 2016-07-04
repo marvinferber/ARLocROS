@@ -16,6 +16,7 @@
 
 package com.github.rosjava_catkin_package_a.ARLocROS;
 
+import com.google.common.base.Optional;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.Quaternion;
@@ -44,6 +45,7 @@ import visualization_msgs.Marker;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Main Class of the ARLocROS Node setting up publishers and subscribers. Note
@@ -128,6 +130,18 @@ public class ARLoc extends AbstractNodeMain {
         // Subscribe to camera info
         Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(
                 parameter.cameraInfoTopic(), sensor_msgs.CameraInfo._TYPE);
+        final CameraInfoService cameraInfoService = CameraInfoService.create(subscriberToCameraInfo);
+        Optional<CameraParams> cameraParamsOptional = cameraInfoService.getCameraParams();
+        while (!cameraParamsOptional.isPresent()) {
+            try {
+                TimeUnit.MILLISECONDS.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            cameraParamsOptional = cameraInfoService.getCameraParams();
+        }
+        camp = cameraParamsOptional.get();
+
         subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
             // FIXME camera info never change, should only received once
             @Override
