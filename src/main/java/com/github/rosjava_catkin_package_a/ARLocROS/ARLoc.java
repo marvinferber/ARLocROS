@@ -108,8 +108,8 @@ public class ARLoc extends AbstractNodeMain {
                         // uncomment to add more contrast to the image
                         // image.convertTo(image, -1, 2, 0.0);
                         // setup camera matrix and return vectors
-                        Mat cameraMatrix = new Mat(new Size(3, 3), CvType.CV_32FC1);
-                        MatOfDouble distCoeffs = new MatOfDouble(new Mat(4, 1, CvType.CV_64FC1));
+                        final Mat cameraMatrix = new Mat(new Size(3, 3), CvType.CV_32FC1);
+                        final MatOfDouble distCoeffs = new MatOfDouble(new Mat(4, 1, CvType.CV_64FC1));
                         CameraParams.getCameraParamas(cameraMatrix, distCoeffs, camp);
                         // compute pose
                         if (ComputePose.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
