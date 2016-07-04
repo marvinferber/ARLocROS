@@ -23,6 +23,7 @@ import geometry_msgs.Quaternion;
 import geometry_msgs.Transform;
 import geometry_msgs.TransformStamped;
 import geometry_msgs.Vector3;
+import jp.nyatla.nyartoolkit.core.NyARException;
 import org.apache.commons.logging.Log;
 import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
@@ -40,11 +41,14 @@ import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sensor_msgs.CameraInfo;
 import tf2_msgs.TFMessage;
 import visualization_msgs.Marker;
 
 import javax.annotation.Nullable;
+import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -53,6 +57,9 @@ import java.util.concurrent.TimeUnit;
  * the TF lookup implementation based on Transformer by Lorenz Moesenlechner.
  */
 public class ARLoc extends AbstractNodeMain {
+
+    private static final Logger logger = LoggerFactory.getLogger(ARLoc.class);
+
     private CameraParams camp;
     private Mat image;
     private Mat rvec;
@@ -87,6 +94,7 @@ public class ARLoc extends AbstractNodeMain {
         // localization
         rvec = new Mat(3, 1, CvType.CV_64F);
         tvec = new MatOfDouble(1.0, 1.0, 1.0);
+
         camp = getCameraInfo(connectedNode, parameter);
 
         // start to listen to transform messages in /tf in order to feed the
@@ -96,6 +104,16 @@ public class ARLoc extends AbstractNodeMain {
         // Subscribe to Image
         Subscriber<sensor_msgs.Image> subscriberToImage = connectedNode.newSubscriber(parameter.cameraImageTopic(),
                 sensor_msgs.Image._TYPE);
+
+        ComputePose computePose = null;
+        try {
+            computePose = ComputePose.create(markerConfig, new Size(camp.width(), camp.height()));
+        } catch (NyARException e) {
+            logger.info("Cannot initialize ComputePose", e);
+        } catch (FileNotFoundException e) {
+            logger.info("Cannot find file when initialize ComputePose", e);
+        }
+        final ComputePose poseProcessor = computePose;
         subscriberToImage.addMessageListener(new MessageListener<sensor_msgs.Image>() {
 
             @Override
@@ -115,7 +133,7 @@ public class ARLoc extends AbstractNodeMain {
                         final Mat cameraMatrix = CameraParams.getCameraMatrix(camp);
                         final MatOfDouble distCoeffs = CameraParams.getDistCoeffs(camp);
                         // compute pose
-                        if (ComputePose.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
+                        if (poseProcessor.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
                                 new Size(camp.width(), camp.height()), markerConfig)) {
                             // notify publisher threads (pose and tf, see below)
                             synchronized (tvec) {
