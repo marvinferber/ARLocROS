@@ -64,8 +64,8 @@ dependencies {
     compile 'org.ros.rosjava_messages:geometry_msgs:[1.11,1.12)'
     compile 'org.ros.rosjava_messages:visualization_msgs:[1.11,1.12)'
     compile 'org.ros.rosjava_messages:sensor_msgs:[1.11,1.12)'
-    compile 'org.opencv:opencv:2.4.8'
-//    compile files('/usr/share/OpenCV/java/opencv-248.jar')
+//    compile 'org.opencv:opencv:2.4.8'
+    compile files('/usr/share/OpenCV/java/opencv-248.jar')
     /* Example of a local subproject dependency */
     /* compile project(':sibling_gradle_project') */
     compile 'com.github.jabrena:NyARToolkit-4.1.1:v4.1.1'
