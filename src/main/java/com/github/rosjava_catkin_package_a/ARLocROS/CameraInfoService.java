@@ -12,6 +12,7 @@ import javax.annotation.Nullable;
 /**
  * This class is designed with the assumption that camera info never changes during the runtime. Therefore, it will
  * only listen to camera info once.
+ * // TODO test this class
  *
  * @author Hoang Tung Dinh
  */

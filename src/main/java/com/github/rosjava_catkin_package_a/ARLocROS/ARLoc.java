@@ -40,6 +40,7 @@ import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
+import sensor_msgs.CameraInfo;
 import tf2_msgs.TFMessage;
 import visualization_msgs.Marker;
 
@@ -86,6 +87,7 @@ public class ARLoc extends AbstractNodeMain {
         // localization
         rvec = new Mat(3, 1, CvType.CV_64F);
         tvec = new MatOfDouble(1.0, 1.0, 1.0);
+        camp = getCameraInfo(connectedNode, parameter);
 
         // start to listen to transform messages in /tf in order to feed the
         // Transformer and lookup transforms
@@ -127,20 +129,6 @@ public class ARLoc extends AbstractNodeMain {
                 }
             }
         });
-        // Subscribe to camera info
-        Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(
-                parameter.cameraInfoTopic(), sensor_msgs.CameraInfo._TYPE);
-        final CameraInfoService cameraInfoService = CameraInfoService.create(subscriberToCameraInfo);
-        Optional<CameraParams> cameraParamsOptional = cameraInfoService.getCameraParams();
-        while (!cameraParamsOptional.isPresent()) {
-            try {
-                TimeUnit.MILLISECONDS.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            cameraParamsOptional = cameraInfoService.getCameraParams();
-        }
-        camp = cameraParamsOptional.get();
 
         // publish tf CAMERA_FRAME_NAME --> MARKER_FRAME_NAME
         final Publisher<tf2_msgs.TFMessage> tfPublisherCamToMarker = connectedNode.newPublisher("tf",
@@ -477,6 +465,23 @@ public class ARLoc extends AbstractNodeMain {
             }
         });
 
+    }
+
+    private static CameraParams getCameraInfo(ConnectedNode connectedNode, Parameter parameter) {// Subscribe to camera info
+        Subscriber<CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(
+                parameter.cameraInfoTopic(), CameraInfo._TYPE);
+        final CameraInfoService cameraInfoService = CameraInfoService.create(subscriberToCameraInfo);
+        Optional<CameraParams> cameraParamsOptional = cameraInfoService.getCameraParams();
+        while (!cameraParamsOptional.isPresent()) {
+            // we're not gonna do anything before getting the camera info
+            try {
+                TimeUnit.MILLISECONDS.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            cameraParamsOptional = cameraInfoService.getCameraParams();
+        }
+        return cameraParamsOptional.get();
     }
 
     /**
