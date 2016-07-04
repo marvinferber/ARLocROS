@@ -113,7 +113,7 @@ public class ARLoc extends AbstractNodeMain {
                         CameraParams.getCameraParamas(cameraMatrix, distCoeffs, camp);
                         // compute pose
                         if (ComputePose.computePose(rvec, tvec, cameraMatrix, distCoeffs, image,
-                                new Size(camp.width, camp.height), markerConfig)) {
+                                new Size(camp.width(), camp.height()), markerConfig)) {
                             // notify publisher threads (pose and tf, see below)
                             synchronized (tvec) {
                                 tvec.notifyAll();
@@ -130,23 +130,24 @@ public class ARLoc extends AbstractNodeMain {
         Subscriber<sensor_msgs.CameraInfo> subscriberToCameraInfo = connectedNode.newSubscriber(
                 parameter.cameraInfoTopic(), sensor_msgs.CameraInfo._TYPE);
         subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
-
+            // FIXME camera info never change, should only received once
             @Override
             public void onNewMessage(sensor_msgs.CameraInfo message) {
                 // capture the camera intrinsics once to be used later by solvepnp
                 if (camp == null) {
-                    camp = new CameraParams();
-                    camp.fx = message.getK()[0];
-                    camp.fy = message.getK()[4];
-                    camp.cx = message.getK()[2];
-                    camp.cy = message.getK()[5];
-                    camp.k1 = message.getD()[0];
-                    camp.k2 = message.getD()[1];
-                    camp.p1 = message.getD()[2];
-                    camp.p2 = message.getD()[3];
-                    camp.width = message.getWidth();
-                    camp.height = message.getHeight();
-                    camp.frame_id = message.getHeader().getFrameId();
+                    camp = CameraParams.builder()
+                            .fx(message.getK()[0])
+                            .fy(message.getK()[4])
+                            .cx(message.getK()[2])
+                            .cy(message.getK()[5])
+                            .k1(message.getD()[0])
+                            .k2(message.getD()[1])
+                            .p1(message.getD()[2])
+                            .p2(message.getD()[3])
+                            .width(message.getWidth())
+                            .height(message.getHeight())
+                            .frame_id(message.getHeader().getFrameId())
+                            .build();
                     log.info("Setting up camera parameters");
                 }
             }
@@ -325,10 +326,9 @@ public class ARLoc extends AbstractNodeMain {
                         return;
                     }
                 } else {
-                    log.info(
-                            "Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! " +
-                                    "However, will " +
-                                    "continue..");
+                    log.info("Cloud not get transformation from " + parameter.cameraFrameName() + " to " + "odom! " +
+                            "However, will " +
+                            "continue..");
                     // cancel this loop..no result can be computed
                     return;
                 }
@@ -412,10 +412,9 @@ public class ARLoc extends AbstractNodeMain {
                         transform_cam_base = transformationService.lookupTransform(targetFrame, sourceFrame);
                     } catch (Exception e) {
                         e.printStackTrace();
-                        log.info(
-                                "Cloud not get transformation from " + parameter.cameraFrameName() + " to " +
-                                        "base_link! " +
-                                        "However, will continue..");
+                        log.info("Cloud not get transformation from " + parameter.cameraFrameName() + " to " +
+                                "base_link! " +
+                                "However, will continue..");
                         // cancel this loop..no result can be computed
                         return;
                     }
