@@ -142,31 +142,6 @@ public class ARLoc extends AbstractNodeMain {
         }
         camp = cameraParamsOptional.get();
 
-        subscriberToCameraInfo.addMessageListener(new MessageListener<sensor_msgs.CameraInfo>() {
-            // FIXME camera info never change, should only received once
-            @Override
-            public void onNewMessage(sensor_msgs.CameraInfo message) {
-                // capture the camera intrinsics once to be used later by solvepnp
-                if (camp == null) {
-                    camp = CameraParams.builder()
-                            .fx(message.getK()[0])
-                            .fy(message.getK()[4])
-                            .cx(message.getK()[2])
-                            .cy(message.getK()[5])
-                            .k1(message.getD()[0])
-                            .k2(message.getD()[1])
-                            .p1(message.getD()[2])
-                            .p2(message.getD()[3])
-                            .width(message.getWidth())
-                            .height(message.getHeight())
-                            .frame_id(message.getHeader().getFrameId())
-                            .build();
-                    log.info("Setting up camera parameters");
-                }
-            }
-        });
-        log.info("Setting up camera parameters");
-
         // publish tf CAMERA_FRAME_NAME --> MARKER_FRAME_NAME
         final Publisher<tf2_msgs.TFMessage> tfPublisherCamToMarker = connectedNode.newPublisher("tf",
                 tf2_msgs.TFMessage._TYPE);
