@@ -372,33 +372,33 @@ public class ARLoc extends AbstractNodeMain {
                 synchronized (tvec) {
                     tvec.wait();
                 }
-                QuaternionHelper q = new QuaternionHelper();
+                final QuaternionHelper q = new QuaternionHelper();
 
                 // convert rotation vector result of solvepnp to rotation matrix
                 Mat R = new Mat(3, 3, CvType.CV_32FC1);
                 Calib3d.Rodrigues(rvec, R);
                 // see publishers before for documentation
-                Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
+                final Mat tvec_map_cam = new MatOfDouble(1.0, 1.0, 1.0);
                 R = R.t();
-                double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
-                double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
-                double attitudeZ = Math.asin(R.get(1, 0)[0]);
+                final double bankX = Math.atan2(-R.get(1, 2)[0], R.get(1, 1)[0]);
+                final double headingY = Math.atan2(-R.get(2, 0)[0], R.get(0, 0)[0]);
+                final double attitudeZ = Math.asin(R.get(1, 0)[0]);
                 q.setFromEuler(bankX, headingY, attitudeZ);
                 Core.multiply(R, new Scalar(-1), R);
                 Core.gemm(R, tvec, 1, new Mat(), 0, tvec_map_cam, 0);
-                org.ros.rosjava_geometry.Quaternion rotation = new org.ros.rosjava_geometry.Quaternion(q.getX(),
+                final org.ros.rosjava_geometry.Quaternion rotation = new org.ros.rosjava_geometry.Quaternion(q.getX(),
                         q.getY(), q.getZ(), q.getW());
-                double x = tvec_map_cam.get(0, 0)[0];
-                double y = tvec_map_cam.get(1, 0)[0];
-                double z = tvec_map_cam.get(2, 0)[0];
+                final double x = tvec_map_cam.get(0, 0)[0];
+                final double y = tvec_map_cam.get(1, 0)[0];
+                final double z = tvec_map_cam.get(2, 0)[0];
 
-                org.ros.rosjava_geometry.Vector3 translation = new org.ros.rosjava_geometry.Vector3(x, y, z);
-                org.ros.rosjava_geometry.Transform transform_map_cam = new org.ros.rosjava_geometry.Transform(
+                final org.ros.rosjava_geometry.Vector3 translation = new org.ros.rosjava_geometry.Vector3(x, y, z);
+                final org.ros.rosjava_geometry.Transform transform_map_cam = new org.ros.rosjava_geometry.Transform(
                         translation, rotation);
 
                 // odom to camera_rgb_optical_frame
-                GraphName sourceFrame = GraphName.of(parameter.cameraFrameName());
-                GraphName targetFrame = GraphName.of("base_link");
+                final GraphName sourceFrame = GraphName.of(parameter.cameraFrameName());
+                final GraphName targetFrame = GraphName.of("base_link");
                 org.ros.rosjava_geometry.Transform transform_cam_base = null;
 
                 if (transformationService.canTransform(targetFrame, sourceFrame)) {
