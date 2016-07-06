@@ -14,6 +14,9 @@
  * the License.
  */
 
+apply plugin: "java"
+apply plugin: "idea"
+
 /* This plugin is necessary for creating installApp tasks (i.e. executables) */
 apply plugin: 'application'
 mainClassName = 'org.ros.RosRun'
@@ -25,7 +28,13 @@ mainClassName = 'org.ros.RosRun'
  cover the patch version only to avoid breakages due to api changes
  which usually occur on minor and major version numbers.
 */
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
 repositories {
+    mavenCentral()
+
     maven {
         url "https://github.com/rosjava/rosjava_mvn_repo/raw/master"
     }
@@ -34,30 +43,43 @@ repositories {
         url "https://jitpack.io"
     }
 
-//    mavenLocal()
-    mavenCentral()
-    repositories {
-        maven {
-            url "http://repo1.maven.org/maven2/"
-        }
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
+    maven {
+        url "http://repo1.maven.org/maven2/"
+    }
+
+    maven {
+        url "https://plugins.gradle.org/m2/"
+    }
+
+    maven {
+        url "https://github.com/agentwise/mvn-repo/raw/master"
     }
 }
 
 
 dependencies {
-  /* An external maven artifact dependency */
-  compile 'org.ros.rosjava_core:rosjava:[0.2,0.3)'
-  compile 'org.ros.rosjava_core:rosjava_geometry:[0.2,0.3)'
-  compile 'org.ros.rosjava_messages:geometry_msgs:[1.11,1.12)'
-  compile 'org.ros.rosjava_messages:visualization_msgs:[1.11,1.12)'
-  compile 'org.ros.rosjava_messages:sensor_msgs:[1.11,1.12)'
-  compile files('/usr/share/OpenCV/java/opencv-248.jar')
-  /* Example of a local subproject dependency */ 
-  /* compile project(':sibling_gradle_project') */
-  compile 'com.github.jabrena:NyARToolkit-4.1.1:v4.1.1'
-  compile 'org.jogamp.gluegen:gluegen-rt-main:2.3.1'
-  compile 'org.jogamp.jogl:jogl-all-main:2.3.1' 
+    /* An external maven artifact dependency */
+    compile 'org.ros.rosjava_core:rosjava:[0.2,0.3)'
+    compile 'org.ros.rosjava_core:rosjava_geometry:[0.2,0.3)'
+    compile 'org.ros.rosjava_messages:geometry_msgs:[1.11,1.12)'
+    compile 'org.ros.rosjava_messages:visualization_msgs:[1.11,1.12)'
+    compile 'org.ros.rosjava_messages:sensor_msgs:[1.11,1.12)'
+//    compile 'org.opencv:opencv:2.4.8'
+    compile files('/usr/share/OpenCV/java/opencv-248.jar')
+    /* Example of a local subproject dependency */
+    /* compile project(':sibling_gradle_project') */
+    compile 'com.github.jabrena:NyARToolkit-4.1.1:v4.1.1'
+    compile 'org.jogamp.gluegen:gluegen-rt-main:2.3.1'
+    compile 'org.jogamp.jogl:jogl-all-main:2.3.1'
+    compile 'com.google.code.findbugs:jsr305:[3.0.0,4.0.0)'
+    compile 'com.google.auto.value:auto-value:1.2'
+    compile 'com.google.guava:guava:19.0'
+    compile 'org.slf4j:slf4j-api:1.7.20'
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
 }
