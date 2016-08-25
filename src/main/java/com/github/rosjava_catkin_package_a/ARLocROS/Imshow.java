@@ -44,6 +44,7 @@ public class Imshow {
 
 	private Boolean SizeCustom;
 	private int Height, Width;
+	
 
 	public Imshow(String title, int height, int width) {
 		SizeCustom = true;
@@ -65,17 +66,17 @@ public class Imshow {
 	 * @param opencvImage
 	 */
 	public static void show(Mat opencvImage) {
+		
 		Dimension frameSize = new Dimension(opencvImage.rows(), opencvImage.cols());
-		if (frame != null)
-			frame.Window.dispose();
-		frame = new Imshow("", frameSize.height, frameSize.width);
-		frame.Window.setResizable(false);
+		if (frame == null) {
+			frame = new Imshow("", frameSize.height, frameSize.width);
+			frame.Window.setResizable(false);
 
-		frame.Window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-		if (frame.SizeCustom) {
-			Imgproc.resize(opencvImage, opencvImage, new Size(frame.Height, frame.Width));
+			frame.Window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+			if (frame.SizeCustom) {
+				Imgproc.resize(opencvImage, opencvImage, new Size(frame.Height, frame.Width));
+			}
 		}
-
 		BufferedImage bufImage = null;
 		try {
 
