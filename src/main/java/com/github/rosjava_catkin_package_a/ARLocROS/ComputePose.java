@@ -16,6 +16,8 @@
 
 package com.github.rosjava_catkin_package_a.ARLocROS;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import jp.nyatla.nyartoolkit.core.NyARCode;
 import jp.nyatla.nyartoolkit.core.NyARException;
 import jp.nyatla.nyartoolkit.core.param.NyARCameraDistortionFactorV2;
@@ -66,6 +68,7 @@ public final class ComputePose {
 	private final MarkerConfig markerConfig;
 	private final Mat cameraMatrix;
 	private final MatOfDouble distCoeffs;
+	private final Int2ObjectMap<NyARCode> arCodes = new Int2ObjectLinkedOpenHashMap<>();
 	
 
 	private ComputePose(MarkerConfig markerConfig, Size size, Mat cameraMatrix, MatOfDouble distCoeffs)
@@ -95,6 +98,7 @@ public final class ComputePose {
 			// create marker description from pattern file and add to marker
 			// system
 			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(markerPatterns.get(i)), 16, 16);
+			arCodes.put(i, code);
 			ids[i] = markerSystemState.addARMarker(code, 25, markerConfig.getMarkerSize());
 			patternmap.put(ids[i], markerPatterns.get(i));
 		}
@@ -119,8 +123,7 @@ public final class ComputePose {
 		for (int i = 0; i < markerPatterns.size(); i++) {
 			// create marker description from pattern file and add to marker
 			// system
-			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(markerPatterns.get(i)), 16, 16);
-			ids[i] = markerSystemState.addARMarker(code, 25, markerConfig.getMarkerSize());
+			ids[i] = markerSystemState.addARMarker(arCodes.get(i), 25, markerConfig.getMarkerSize());
 			patternmap.put(ids[i], markerPatterns.get(i));
 		}
 		
