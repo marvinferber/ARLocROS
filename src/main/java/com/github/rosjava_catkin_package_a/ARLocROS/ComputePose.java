@@ -69,10 +69,13 @@ public final class ComputePose {
 	private final Mat cameraMatrix;
 	private final MatOfDouble distCoeffs;
 	private final Int2ObjectMap<NyARCode> arCodes = new Int2ObjectLinkedOpenHashMap<>();
+	private final boolean visualization;
 	
 
-	private ComputePose(MarkerConfig markerConfig, Size size, Mat cameraMatrix, MatOfDouble distCoeffs)
+	private ComputePose(MarkerConfig markerConfig, Size size, Mat cameraMatrix, MatOfDouble
+			distCoeffs, boolean visualization)
 			throws NyARException, FileNotFoundException {
+		this.visualization = visualization;
 		this.markerConfig = markerConfig;
 		this.cameraMatrix = cameraMatrix;
 		this.distCoeffs = distCoeffs;
@@ -166,8 +169,10 @@ public final class ComputePose {
 		final MatOfPoint2f imagePoints = new MatOfPoint2f();
 		imagePoints.fromList(points2dlist);
 
-		// show image with markers detected
-		Imshow.show(image2);
+		if (visualization) {
+			// show image with markers detected
+			Imshow.show(image2);
+		}
 
 		// do not call solvePNP with empty intput data (no markers detected)
 		if (points2dlist.size() == 0) {

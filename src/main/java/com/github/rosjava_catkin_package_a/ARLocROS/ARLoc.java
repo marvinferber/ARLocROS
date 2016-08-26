@@ -110,7 +110,7 @@ public class ARLoc extends AbstractNodeMain {
             final Mat cameraMatrix = CameraParams.getCameraMatrix(camp);
             final MatOfDouble distCoeffs = CameraParams.getDistCoeffs(camp);
             computePose = ComputePose.create(markerConfig, new Size(camp.width(), camp.height()), cameraMatrix,
-                    distCoeffs);
+                    distCoeffs, this.parameter.visualization());
         } catch (NyARException e) {
             logger.info("Cannot initialize ComputePose", e);
         } catch (FileNotFoundException e) {
@@ -359,7 +359,8 @@ public class ARLoc extends AbstractNodeMain {
 
         // Publish Pose
 
-        final Publisher<geometry_msgs.PoseStamped> posePublisher = connectedNode.newPublisher("arlocros/pose",
+        final Publisher<geometry_msgs.PoseStamped> posePublisher = connectedNode.newPublisher
+            (parameter.poseTopicName(),
                 geometry_msgs.PoseStamped._TYPE);
 
         connectedNode.executeCancellableLoop(new CancellableLoop() {

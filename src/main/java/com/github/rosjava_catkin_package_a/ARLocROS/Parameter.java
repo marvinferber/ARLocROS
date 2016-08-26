@@ -25,6 +25,10 @@ public abstract class Parameter {
 
     public abstract boolean badPoseReject();
 
+    public abstract String poseTopicName();
+
+    public abstract boolean visualization();
+
     public static Parameter createFromParameterTree(ParameterTree parameterTree) {
         return builder().patternDirectory(parameterTree.getString("/ARLocROS/pattern_dir"))
                 .markerConfigFile(parameterTree.getString("/ARLocROS/marker_config_file"))
@@ -33,6 +37,8 @@ public abstract class Parameter {
                 .cameraImageTopic(parameterTree.getString("/ARLocROS/camera_image_topic"))
                 .cameraInfoTopic(parameterTree.getString("/ARLocROS/camera_info_topic"))
                 .badPoseReject(parameterTree.getBoolean("/ARLocROS/bad_pose_reject"))
+                .poseTopicName(parameterTree.getString("/ARLocROS/pose_topic_name"))
+                .visualization(parameterTree.getBoolean("/ARLocROS/visualization"))
                 .build();
     }
 
@@ -55,6 +61,10 @@ public abstract class Parameter {
         public abstract Builder markerConfigFile(String value);
 
         public abstract Builder badPoseReject(boolean value);
+
+        public abstract Builder poseTopicName(String value);
+
+        public abstract Builder visualization(boolean value);
 
         public abstract Parameter build();
     }

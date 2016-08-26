@@ -6,6 +6,8 @@
         <param name="camera_image_topic" value="/bebop/image_raw" />
         <param name="camera_info_topic" value="/bebop/camera_info" />
         <param name="marker_config_file" value="$(find rosjava_catkin_package_a)/ARLocROS/config/stage.cfg" />
-        <param name="bad_pose_reject" value="false" />
+        <param name="bad_pose_reject" value="true" />
+        <param name="pose_topic_name" value="arlocros/pose"/>
+        <param name="visualization" value="true"/>
     </node>
 </launch>
