@@ -107,9 +107,10 @@ public final class ComputePose {
 		}
 	}
 
-	public static ComputePose create(MarkerConfig markerConfig, Size size, Mat cameraMatrix, MatOfDouble distCoeffs)
+	public static ComputePose create(MarkerConfig markerConfig, Size size, Mat cameraMatrix,
+			MatOfDouble distCoeffs, boolean visualization)
 			throws NyARException, FileNotFoundException {
-		return new ComputePose(markerConfig, size, cameraMatrix, distCoeffs);
+		return new ComputePose(markerConfig, size, cameraMatrix, distCoeffs, visualization);
 	}
 
 	public boolean computePose(Mat rvec, Mat tvec, Mat image2) throws NyARException, FileNotFoundException {
