@@ -8,6 +8,6 @@
         <param name="marker_config_file" value="$(find rosjava_catkin_package_a)/ARLocROS/config/stage.cfg" />
         <param name="bad_pose_reject" value="true" />
         <param name="pose_topic_name" value="arlocros/pose"/>
-        <param name="visualization" value="true"/>
+        <param name="visualization" value="false"/>
     </node>
 </launch>
