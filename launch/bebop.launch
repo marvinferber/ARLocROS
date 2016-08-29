@@ -2,7 +2,8 @@
     <arg name="drone_name"/>
     <arg name="pose_topic_name"/>
 
-    <node pkg="rosjava_catkin_package_a" type="ARLocROS" name="ARLocROS" args="com.github.rosjava_catkin_package_a.ARLocROS.ARLoc" output="screen">
+    <node pkg="rats" type="ARLocROS" name="ARLocROS"
+          args="com.github.rosjava_catkin_package_a.ARLocROS.ARLoc" output="screen">
         <param name="pattern_dir" value="$(find rosjava_catkin_package_a)/ARLocROS/res/"/>
         <param name="marker_frame_name" value="markers" />
         <param name="camera_frame_name" value="$(arg drone_name)_camera_optical" />
