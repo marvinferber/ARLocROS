@@ -4,12 +4,12 @@
 
     <node pkg="rats" type="ARLocROS" name="ARLocROS"
           args="com.github.rosjava_catkin_package_a.ARLocROS.ARLoc" output="screen">
-        <param name="pattern_dir" value="$(find rosjava_catkin_package_a)/ARLocROS/res/"/>
+        <param name="pattern_dir" value="$(find rats)/ARLocROS/res/"/>
         <param name="marker_frame_name" value="markers" />
         <param name="camera_frame_name" value="$(arg drone_name)_camera_optical" />
         <param name="camera_image_topic" value="/$(arg drone_name)/image_raw" />
         <param name="camera_info_topic" value="/$(arg drone_name)/camera_info" />
-        <param name="marker_config_file" value="$(find rosjava_catkin_package_a)/ARLocROS/config/stage.cfg" />
+        <param name="marker_config_file" value="$(find rats)/ARLocROS/config/stage.cfg" />
         <param name="bad_pose_reject" value="true" />
         <param name="pose_topic_name" value="$(arg pose_topic_name)"/>
         <param name="visualization" value="false"/>
