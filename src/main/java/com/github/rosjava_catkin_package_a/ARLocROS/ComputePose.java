@@ -16,6 +16,8 @@
 
 package com.github.rosjava_catkin_package_a.ARLocROS;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import jp.nyatla.nyartoolkit.core.NyARCode;
 import jp.nyatla.nyartoolkit.core.NyARException;
 import jp.nyatla.nyartoolkit.core.param.NyARCameraDistortionFactorV2;
@@ -66,10 +68,14 @@ public final class ComputePose {
 	private final MarkerConfig markerConfig;
 	private final Mat cameraMatrix;
 	private final MatOfDouble distCoeffs;
+	private final Int2ObjectMap<NyARCode> arCodes = new Int2ObjectLinkedOpenHashMap<>();
+	private final boolean visualization;
 	
 
-	private ComputePose(MarkerConfig markerConfig, Size size, Mat cameraMatrix, MatOfDouble distCoeffs)
+	private ComputePose(MarkerConfig markerConfig, Size size, Mat cameraMatrix, MatOfDouble
+			distCoeffs, boolean visualization)
 			throws NyARException, FileNotFoundException {
+		this.visualization = visualization;
 		this.markerConfig = markerConfig;
 		this.cameraMatrix = cameraMatrix;
 		this.distCoeffs = distCoeffs;
@@ -95,14 +101,16 @@ public final class ComputePose {
 			// create marker description from pattern file and add to marker
 			// system
 			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(markerPatterns.get(i)), 16, 16);
+			arCodes.put(i, code);
 			ids[i] = markerSystemState.addARMarker(code, 25, markerConfig.getMarkerSize());
 			patternmap.put(ids[i], markerPatterns.get(i));
 		}
 	}
 
-	public static ComputePose create(MarkerConfig markerConfig, Size size, Mat cameraMatrix, MatOfDouble distCoeffs)
+	public static ComputePose create(MarkerConfig markerConfig, Size size, Mat cameraMatrix,
+			MatOfDouble distCoeffs, boolean visualization)
 			throws NyARException, FileNotFoundException {
-		return new ComputePose(markerConfig, size, cameraMatrix, distCoeffs);
+		return new ComputePose(markerConfig, size, cameraMatrix, distCoeffs, visualization);
 	}
 
 	public boolean computePose(Mat rvec, Mat tvec, Mat image2) throws NyARException, FileNotFoundException {
@@ -119,8 +127,7 @@ public final class ComputePose {
 		for (int i = 0; i < markerPatterns.size(); i++) {
 			// create marker description from pattern file and add to marker
 			// system
-			NyARCode code = NyARCode.createFromARPattFile(new FileInputStream(markerPatterns.get(i)), 16, 16);
-			ids[i] = markerSystemState.addARMarker(code, 25, markerConfig.getMarkerSize());
+			ids[i] = markerSystemState.addARMarker(arCodes.get(i), 25, markerConfig.getMarkerSize());
 			patternmap.put(ids[i], markerPatterns.get(i));
 		}
 		
@@ -163,8 +170,10 @@ public final class ComputePose {
 		final MatOfPoint2f imagePoints = new MatOfPoint2f();
 		imagePoints.fromList(points2dlist);
 
-		// show image with markers detected
-		Imshow.show(image2);
+		if (visualization) {
+			// show image with markers detected
+			Imshow.show(image2);
+		}
 
 		// do not call solvePNP with empty intput data (no markers detected)
 		if (points2dlist.size() == 0) {
