@@ -16,14 +16,12 @@
 
 package com.github.rosjava_catkin_package_a.ARLocROS;
 
-import com.google.common.base.Optional;
-import geometry_msgs.Point;
-import geometry_msgs.Pose;
-import geometry_msgs.Quaternion;
-import geometry_msgs.Transform;
-import geometry_msgs.TransformStamped;
-import geometry_msgs.Vector3;
-import jp.nyatla.nyartoolkit.core.NyARException;
+import java.io.FileNotFoundException;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation.Nullable;
+
 import org.apache.commons.logging.Log;
 import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
@@ -44,14 +42,19 @@ import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Optional;
+
+import geometry_msgs.Point;
+import geometry_msgs.Pose;
+import geometry_msgs.Quaternion;
+import geometry_msgs.Transform;
+import geometry_msgs.TransformStamped;
+import geometry_msgs.Vector3;
+import jp.nyatla.nyartoolkit.core.NyARException;
 import sensor_msgs.CameraInfo;
 import tf2_msgs.TFMessage;
 import visualization_msgs.Marker;
-
-import javax.annotation.Nullable;
-import java.io.FileNotFoundException;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Main Class of the ARLocROS Node setting up publishers and subscribers. Note
@@ -71,6 +74,8 @@ public class ARLoc extends AbstractNodeMain {
 	private MarkerConfig markerConfig;
 	protected org.ros.rosjava_geometry.Transform last_pose;
 	protected Time last_timestamp;
+
+	protected boolean smoothing = true;
 	private static Log log;
 
 	@Override
@@ -133,7 +138,8 @@ public class ARLoc extends AbstractNodeMain {
 						//
 						image = Utils.matFromImage(message);
 						// uncomment to add more contrast to the image
-						Utils.tresholdContrastBlackWhite(image, 600);
+						//Utils.tresholdContrastBlackWhite(image, 600);
+						Imgproc.threshold(image, image, 200, 255, Imgproc.THRESH_BINARY);
 						// Mat cannyimg = new Mat(image.height(), image.width(),
 						// CvType.CV_8UC3);
 						// Imgproc.Canny(image, cannyimg, 10, 100);
@@ -442,6 +448,19 @@ public class ARLoc extends AbstractNodeMain {
 						double distance = PoseCompare.distance(current_pose, last_pose);
 						double timedelta = PoseCompare.timedelta(current_timestamp, last_timestamp);
 						if ((distance / timedelta) < maxspeed) {
+							if (smoothing) {
+								double xold = last_pose.getTranslation().getX();
+								double yold = last_pose.getTranslation().getY();
+								double zold = last_pose.getTranslation().getZ();
+								double xnew = current_pose.getTranslation().getX();
+								double ynew = current_pose.getTranslation().getY();
+								double znew = current_pose.getTranslation().getZ();
+								final org.ros.rosjava_geometry.Vector3 smoothTranslation = new org.ros.rosjava_geometry.Vector3(
+										(xold * 2 + xnew) / 3, (yold * 2 + ynew) / 3, (zold * 2 + znew) / 3);
+								current_pose = new org.ros.rosjava_geometry.Transform(smoothTranslation,
+										current_pose.getRotationAndScale());
+								last_pose = current_pose;
+							}
 							last_pose = current_pose;
 							last_timestamp = current_timestamp;
 							goodpose = true;
