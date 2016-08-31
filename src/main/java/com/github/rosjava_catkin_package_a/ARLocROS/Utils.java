@@ -23,7 +23,6 @@ import org.opencv.core.Mat;
 
 import sensor_msgs.Image;
 
-
 public class Utils {
 
 	static public Mat matFromImage(final Image source) throws Exception {
@@ -34,4 +33,18 @@ public class Utils {
 		return cvImage;
 	}
 
+	static public void tresholdContrastBlackWhite(Mat image2, double d) {
+		int width = image2.width();
+		int height = image2.height();
+		for (int i = 0; i < width; i++)
+			for (int j = 0; j < height; j++) {
+				double[] rgb = image2.get(j, i);
+				double[] rgbnew = new double[rgb.length];
+				if (rgb[0] + rgb[1] + rgb[2] < d)
+					rgbnew[0] = rgbnew[1] = rgbnew[2] = 0.0;
+				else
+					rgbnew[0] = rgbnew[1] = rgbnew[2] = 255.0;
+				image2.put(j, i, rgbnew);
+			}
+	}
 }
