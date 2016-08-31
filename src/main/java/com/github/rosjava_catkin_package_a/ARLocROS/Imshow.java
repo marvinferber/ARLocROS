@@ -70,8 +70,8 @@ public class Imshow {
 		Dimension frameSize = new Dimension(opencvImage.rows(), opencvImage.cols());
 		if (frame == null) {
 			frame = new Imshow("", frameSize.height, frameSize.width);
-			frame.Window.setResizable(false);
-
+			frame.Window.setVisible(true);
+			
 			frame.Window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 			if (frame.SizeCustom) {
 				Imgproc.resize(opencvImage, opencvImage, new Size(frame.Height, frame.Width));
@@ -94,7 +94,7 @@ public class Imshow {
 			frame.image.setImage(bufImage);
 			frame.Window.pack();
 			frame.label.updateUI();
-			frame.Window.setVisible(true);
+			//frame.Window.setVisible(true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

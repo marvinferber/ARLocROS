@@ -140,7 +140,7 @@ public final class ComputePose {
 
 		for (final int id : ids) {
 			// process only if this marker has been detected
-			if (markerSystemState.isExistMarker(id)) {
+			if (markerSystemState.isExistMarker(id) && markerSystemState.getConfidence(id)>0.7) {
 				// read and add 2D points
 				final NyARIntPoint2d[] vertex2d = markerSystemState.getMarkerVertex2D(id);
 				Point p = new Point(vertex2d[0].x, vertex2d[0].y);
