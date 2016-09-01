@@ -45,8 +45,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Optional;
 
-import geometry_msgs.Point;
-import geometry_msgs.Pose;
 import geometry_msgs.Quaternion;
 import geometry_msgs.Transform;
 import geometry_msgs.TransformStamped;
@@ -72,10 +70,15 @@ public class ARLoc extends AbstractNodeMain {
 	@Nullable
 	private Parameter parameter;
 	private MarkerConfig markerConfig;
-	protected org.ros.rosjava_geometry.Transform last_pose;
-	protected Time last_timestamp;
+	protected org.ros.rosjava_geometry.Transform lastPose;
+	protected Time lastPoseTimestamp;
+	protected Time lastOdomTimestamp;
 
 	protected boolean smoothing = true;
+
+	protected org.ros.rosjava_geometry.Transform oldOdomTransform;
+
+	protected org.ros.rosjava_geometry.Transform odomDelta;
 	private static Log log;
 
 	@Override
@@ -108,6 +111,47 @@ public class ARLoc extends AbstractNodeMain {
 		// Transformer and lookup transforms
 		final TransformationService transformationService = TransformationService.create(connectedNode);
 
+		// init pose publisher
+		final Publisher<geometry_msgs.PoseStamped> posePublisher = connectedNode.newPublisher(parameter.poseTopicName(),
+				geometry_msgs.PoseStamped._TYPE);
+
+		// Subscribe to odom
+		Subscriber<nav_msgs.Odometry> subscriberToOdom = connectedNode.newSubscriber("/bebop/odom",
+				nav_msgs.Odometry._TYPE);
+		subscriberToOdom.addMessageListener(new MessageListener<nav_msgs.Odometry>() {
+
+			@Override
+			public void onNewMessage(nav_msgs.Odometry odom) {
+				// set last odom value when invoked the first time, then wait
+				// for second message
+				if (oldOdomTransform == null) {
+					oldOdomTransform = org.ros.rosjava_geometry.Transform.fromPoseMessage(odom.getPose().getPose());
+					lastOdomTimestamp = connectedNode.getCurrentTime();
+				} else {
+					// convert to current transform
+					org.ros.rosjava_geometry.Transform newOdomTransform = org.ros.rosjava_geometry.Transform
+							.fromPoseMessage(odom.getPose().getPose());
+					// compute delta
+					odomDelta = oldOdomTransform.invert().multiply(newOdomTransform);
+					// save for current pose for next message
+					oldOdomTransform = newOdomTransform;
+					// do something when odom is newer than pose
+					if (lastPoseTimestamp != null && lastOdomTimestamp.compareTo(lastPoseTimestamp) >= 0) {
+						log.info("Pose outdateted --> Odom newer!");
+						org.ros.rosjava_geometry.Transform current_pose = lastPose.multiply(odomDelta);
+						lastPose = current_pose;
+						lastPoseTimestamp = connectedNode.getCurrentTime();
+						// set information to message
+						geometry_msgs.PoseStamped posestamped = posePublisher.newMessage();
+						current_pose.toPoseStampedMessage(GraphName.of("map"), connectedNode.getCurrentTime(),
+								posestamped);
+						posePublisher.publish(posestamped);
+					}
+					lastOdomTimestamp = connectedNode.getCurrentTime();
+				}
+			}
+		});
+
 		// Subscribe to Image
 		Subscriber<sensor_msgs.Image> subscriberToImage = connectedNode.newSubscriber(parameter.cameraImageTopic(),
 				sensor_msgs.Image._TYPE);
@@ -138,8 +182,8 @@ public class ARLoc extends AbstractNodeMain {
 						//
 						image = Utils.matFromImage(message);
 						// uncomment to add more contrast to the image
-						//Utils.tresholdContrastBlackWhite(image, 600);
-						Imgproc.threshold(image, image, 200, 255, Imgproc.THRESH_BINARY);
+						// Utils.tresholdContrastBlackWhite(image, 600);
+						Imgproc.threshold(image, image, 127, 255, Imgproc.THRESH_BINARY);
 						// Mat cannyimg = new Mat(image.height(), image.width(),
 						// CvType.CV_8UC3);
 						// Imgproc.Canny(image, cannyimg, 10, 100);
@@ -369,10 +413,6 @@ public class ARLoc extends AbstractNodeMain {
 		});
 
 		// Publish Pose
-
-		final Publisher<geometry_msgs.PoseStamped> posePublisher = connectedNode.newPublisher(parameter.poseTopicName(),
-				geometry_msgs.PoseStamped._TYPE);
-
 		connectedNode.executeCancellableLoop(new CancellableLoop() {
 
 			@Override
@@ -440,18 +480,18 @@ public class ARLoc extends AbstractNodeMain {
 					Time current_timestamp = connectedNode.getCurrentTime();
 					// TODO Unfortunately, we do not have the tf timestamp at
 					// hand here. So we can only use the current timestamp.
-					double maxspeed = 5;
+					double maxspeed = 10;
 					boolean goodpose = false;
 					// if (current_pose != null && current_timestamp != null) {
-					if (last_pose != null && last_timestamp != null) {
+					if (lastPose != null && lastPoseTimestamp != null) {
 						// check speed of movement between last and current pose
-						double distance = PoseCompare.distance(current_pose, last_pose);
-						double timedelta = PoseCompare.timedelta(current_timestamp, last_timestamp);
+						double distance = PoseCompare.distance(current_pose, lastPose);
+						double timedelta = PoseCompare.timedelta(current_timestamp, lastPoseTimestamp);
 						if ((distance / timedelta) < maxspeed) {
 							if (smoothing) {
-								double xold = last_pose.getTranslation().getX();
-								double yold = last_pose.getTranslation().getY();
-								double zold = last_pose.getTranslation().getZ();
+								double xold = lastPose.getTranslation().getX();
+								double yold = lastPose.getTranslation().getY();
+								double zold = lastPose.getTranslation().getZ();
 								double xnew = current_pose.getTranslation().getX();
 								double ynew = current_pose.getTranslation().getY();
 								double znew = current_pose.getTranslation().getZ();
@@ -459,18 +499,17 @@ public class ARLoc extends AbstractNodeMain {
 										(xold * 2 + xnew) / 3, (yold * 2 + ynew) / 3, (zold * 2 + znew) / 3);
 								current_pose = new org.ros.rosjava_geometry.Transform(smoothTranslation,
 										current_pose.getRotationAndScale());
-								last_pose = current_pose;
 							}
-							last_pose = current_pose;
-							last_timestamp = current_timestamp;
+							lastPose = current_pose;
+							lastPoseTimestamp = current_timestamp;
 							goodpose = true;
 						} else {
-							log.info("distance " + distance + " time: " + timedelta + " --> Pose rejected");
+							log.debug("distance " + distance + " time: " + timedelta + " --> Pose rejected");
 						}
 
 					} else {
-						last_pose = current_pose;
-						last_timestamp = current_timestamp;
+						lastPose = current_pose;
+						lastPoseTimestamp = current_timestamp;
 					}
 					// }
 					// bad pose rejection
@@ -478,27 +517,10 @@ public class ARLoc extends AbstractNodeMain {
 						return;
 					}
 				}
-
+				log.info("Odom outdateted --> Pose newer!");
 				// set information to message
 				geometry_msgs.PoseStamped posestamped = posePublisher.newMessage();
-				Pose pose = posestamped.getPose();
-				Quaternion orientation = pose.getOrientation();
-				Point point = pose.getPosition();
-
-				point.setX(current_pose.getTranslation().getX());
-
-				point.setY(current_pose.getTranslation().getY());
-
-				point.setZ(current_pose.getTranslation().getZ());
-
-				orientation.setW(current_pose.getRotationAndScale().getW());
-				orientation.setX(current_pose.getRotationAndScale().getX());
-				orientation.setY(current_pose.getRotationAndScale().getY());
-				orientation.setZ(current_pose.getRotationAndScale().getZ());
-
-				// frame_id too
-				posestamped.getHeader().setFrameId("map");
-				posestamped.getHeader().setStamp(connectedNode.getCurrentTime());
+				current_pose.toPoseStampedMessage(GraphName.of("map"), connectedNode.getCurrentTime(), posestamped);
 				posePublisher.publish(posestamped);
 
 			}
